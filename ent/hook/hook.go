@@ -6,18 +6,31 @@ import (
 	"context"
 	"fmt"
 
-	"entgo.io/bug/ent"
+	"github.com/lrstanley/ent-relay-conn-bug/ent"
 )
 
-// The UserFunc type is an adapter to allow the use of ordinary
-// function as User mutator.
-type UserFunc func(context.Context, *ent.UserMutation) (ent.Value, error)
+// The GuildFunc type is an adapter to allow the use of ordinary
+// function as Guild mutator.
+type GuildFunc func(context.Context, *ent.GuildMutation) (ent.Value, error)
 
 // Mutate calls f(ctx, m).
-func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	mv, ok := m.(*ent.UserMutation)
+func (f GuildFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	mv, ok := m.(*ent.GuildMutation)
 	if !ok {
-		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
+		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GuildMutation", m)
+	}
+	return f(ctx, mv)
+}
+
+// The GuildSettingsFunc type is an adapter to allow the use of ordinary
+// function as GuildSettings mutator.
+type GuildSettingsFunc func(context.Context, *ent.GuildSettingsMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f GuildSettingsFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	mv, ok := m.(*ent.GuildSettingsMutation)
+	if !ok {
+		return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GuildSettingsMutation", m)
 	}
 	return f(ctx, mv)
 }

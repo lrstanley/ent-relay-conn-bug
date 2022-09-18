@@ -8,23 +8,62 @@ import (
 )
 
 var (
-	// UsersColumns holds the columns for the "users" table.
-	UsersColumns = []*schema.Column{
+	// GuildsColumns holds the columns for the "guilds" table.
+	GuildsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "age", Type: field.TypeInt},
-		{Name: "name", Type: field.TypeString},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "guild_id", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "features", Type: field.TypeJSON, Nullable: true},
+		{Name: "icon_hash", Type: field.TypeString, Nullable: true, Size: 2048},
+		{Name: "icon_url", Type: field.TypeString, Size: 2048},
+		{Name: "joined_at", Type: field.TypeTime},
+		{Name: "large", Type: field.TypeBool, Nullable: true, Default: false},
+		{Name: "member_count", Type: field.TypeInt, Nullable: true, Default: 0},
+		{Name: "owner_id", Type: field.TypeString},
+		{Name: "permissions", Type: field.TypeUint64, Nullable: true, Default: 0},
+		{Name: "region", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "system_channel_flags", Type: field.TypeString, Nullable: true, Size: 32},
 	}
-	// UsersTable holds the schema information for the "users" table.
-	UsersTable = &schema.Table{
-		Name:       "users",
-		Columns:    UsersColumns,
-		PrimaryKey: []*schema.Column{UsersColumns[0]},
+	// GuildsTable holds the schema information for the "guilds" table.
+	GuildsTable = &schema.Table{
+		Name:       "guilds",
+		Columns:    GuildsColumns,
+		PrimaryKey: []*schema.Column{GuildsColumns[0]},
+	}
+	// GuildSettingsColumns holds the columns for the "guild_settings" table.
+	GuildSettingsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "enabled", Type: field.TypeBool},
+		{Name: "default_max_clones", Type: field.TypeInt, Nullable: true, Default: 0},
+		{Name: "regex_match", Type: field.TypeString, Nullable: true, Size: 100, Default: ""},
+		{Name: "contact_email", Type: field.TypeString, Nullable: true, Size: 255, Default: ""},
+		{Name: "guild_guild_settings", Type: field.TypeInt, Unique: true},
+	}
+	// GuildSettingsTable holds the schema information for the "guild_settings" table.
+	GuildSettingsTable = &schema.Table{
+		Name:       "guild_settings",
+		Columns:    GuildSettingsColumns,
+		PrimaryKey: []*schema.Column{GuildSettingsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "guild_settings_guilds_guild_settings",
+				Columns:    []*schema.Column{GuildSettingsColumns[7]},
+				RefColumns: []*schema.Column{GuildsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
-		UsersTable,
+		GuildsTable,
+		GuildSettingsTable,
 	}
 )
 
 func init() {
+	GuildSettingsTable.ForeignKeys[0].RefTable = GuildsTable
 }

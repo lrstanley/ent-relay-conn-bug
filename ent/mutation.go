@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
-	"entgo.io/bug/ent/predicate"
-	"entgo.io/bug/ent/user"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/guild"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/guildsettings"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/predicate"
 
 	"entgo.io/ent"
 )
@@ -23,35 +25,51 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeUser = "User"
+	TypeGuild         = "Guild"
+	TypeGuildSettings = "GuildSettings"
 )
 
-// UserMutation represents an operation that mutates the User nodes in the graph.
-type UserMutation struct {
+// GuildMutation represents an operation that mutates the Guild nodes in the graph.
+type GuildMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	age           *int
-	addage        *int
-	name          *string
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*User, error)
-	predicates    []predicate.User
+	op                    Op
+	typ                   string
+	id                    *int
+	create_time           *time.Time
+	update_time           *time.Time
+	guild_id              *string
+	name                  *string
+	features              *[]string
+	icon_hash             *string
+	icon_url              *string
+	joined_at             *time.Time
+	large                 *bool
+	member_count          *int
+	addmember_count       *int
+	owner_id              *string
+	permissions           *uint64
+	addpermissions        *int64
+	region                *string
+	system_channel_flags  *string
+	clearedFields         map[string]struct{}
+	guild_settings        *int
+	clearedguild_settings bool
+	done                  bool
+	oldValue              func(context.Context) (*Guild, error)
+	predicates            []predicate.Guild
 }
 
-var _ ent.Mutation = (*UserMutation)(nil)
+var _ ent.Mutation = (*GuildMutation)(nil)
 
-// userOption allows management of the mutation configuration using functional options.
-type userOption func(*UserMutation)
+// guildOption allows management of the mutation configuration using functional options.
+type guildOption func(*GuildMutation)
 
-// newUserMutation creates new mutation for the User entity.
-func newUserMutation(c config, op Op, opts ...userOption) *UserMutation {
-	m := &UserMutation{
+// newGuildMutation creates new mutation for the Guild entity.
+func newGuildMutation(c config, op Op, opts ...guildOption) *GuildMutation {
+	m := &GuildMutation{
 		config:        c,
 		op:            op,
-		typ:           TypeUser,
+		typ:           TypeGuild,
 		clearedFields: make(map[string]struct{}),
 	}
 	for _, opt := range opts {
@@ -60,20 +78,20 @@ func newUserMutation(c config, op Op, opts ...userOption) *UserMutation {
 	return m
 }
 
-// withUserID sets the ID field of the mutation.
-func withUserID(id int) userOption {
-	return func(m *UserMutation) {
+// withGuildID sets the ID field of the mutation.
+func withGuildID(id int) guildOption {
+	return func(m *GuildMutation) {
 		var (
 			err   error
 			once  sync.Once
-			value *User
+			value *Guild
 		)
-		m.oldValue = func(ctx context.Context) (*User, error) {
+		m.oldValue = func(ctx context.Context) (*Guild, error) {
 			once.Do(func() {
 				if m.done {
 					err = errors.New("querying old values post mutation is not allowed")
 				} else {
-					value, err = m.Client().User.Get(ctx, id)
+					value, err = m.Client().Guild.Get(ctx, id)
 				}
 			})
 			return value, err
@@ -82,10 +100,10 @@ func withUserID(id int) userOption {
 	}
 }
 
-// withUser sets the old User of the mutation.
-func withUser(node *User) userOption {
-	return func(m *UserMutation) {
-		m.oldValue = func(context.Context) (*User, error) {
+// withGuild sets the old Guild of the mutation.
+func withGuild(node *Guild) guildOption {
+	return func(m *GuildMutation) {
+		m.oldValue = func(context.Context) (*Guild, error) {
 			return node, nil
 		}
 		m.id = &node.ID
@@ -94,7 +112,7 @@ func withUser(node *User) userOption {
 
 // Client returns a new `ent.Client` from the mutation. If the mutation was
 // executed in a transaction (ent.Tx), a transactional client is returned.
-func (m UserMutation) Client() *Client {
+func (m GuildMutation) Client() *Client {
 	client := &Client{config: m.config}
 	client.init()
 	return client
@@ -102,7 +120,7 @@ func (m UserMutation) Client() *Client {
 
 // Tx returns an `ent.Tx` for mutations that were executed in transactions;
 // it returns an error otherwise.
-func (m UserMutation) Tx() (*Tx, error) {
+func (m GuildMutation) Tx() (*Tx, error) {
 	if _, ok := m.driver.(*txDriver); !ok {
 		return nil, errors.New("ent: mutation is not running in a transaction")
 	}
@@ -113,7 +131,7 @@ func (m UserMutation) Tx() (*Tx, error) {
 
 // ID returns the ID value in the mutation. Note that the ID is only available
 // if it was provided to the builder or after it was returned from the database.
-func (m *UserMutation) ID() (id int, exists bool) {
+func (m *GuildMutation) ID() (id int, exists bool) {
 	if m.id == nil {
 		return
 	}
@@ -124,7 +142,7 @@ func (m *UserMutation) ID() (id int, exists bool) {
 // That means, if the mutation is applied within a transaction with an isolation level such
 // as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
 // or updated by the mutation.
-func (m *UserMutation) IDs(ctx context.Context) ([]int, error) {
+func (m *GuildMutation) IDs(ctx context.Context) ([]int, error) {
 	switch {
 	case m.op.Is(OpUpdateOne | OpDeleteOne):
 		id, exists := m.ID()
@@ -133,75 +151,127 @@ func (m *UserMutation) IDs(ctx context.Context) ([]int, error) {
 		}
 		fallthrough
 	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().User.Query().Where(m.predicates...).IDs(ctx)
+		return m.Client().Guild.Query().Where(m.predicates...).IDs(ctx)
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
 }
 
-// SetAge sets the "age" field.
-func (m *UserMutation) SetAge(i int) {
-	m.age = &i
-	m.addage = nil
+// SetCreateTime sets the "create_time" field.
+func (m *GuildMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
 }
 
-// Age returns the value of the "age" field in the mutation.
-func (m *UserMutation) Age() (r int, exists bool) {
-	v := m.age
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *GuildMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldAge returns the old "age" field's value of the User entity.
-// If the User object wasn't provided to the builder, the object is fetched from the database.
+// OldCreateTime returns the old "create_time" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UserMutation) OldAge(ctx context.Context) (v int, err error) {
+func (m *GuildMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAge is only allowed on UpdateOne operations")
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAge requires an ID field in the mutation")
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAge: %w", err)
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
 	}
-	return oldValue.Age, nil
+	return oldValue.CreateTime, nil
 }
 
-// AddAge adds i to the "age" field.
-func (m *UserMutation) AddAge(i int) {
-	if m.addage != nil {
-		*m.addage += i
-	} else {
-		m.addage = &i
-	}
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *GuildMutation) ResetCreateTime() {
+	m.create_time = nil
 }
 
-// AddedAge returns the value that was added to the "age" field in this mutation.
-func (m *UserMutation) AddedAge() (r int, exists bool) {
-	v := m.addage
+// SetUpdateTime sets the "update_time" field.
+func (m *GuildMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *GuildMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// ResetAge resets all changes to the "age" field.
-func (m *UserMutation) ResetAge() {
-	m.age = nil
-	m.addage = nil
+// OldUpdateTime returns the old "update_time" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *GuildMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetGuildID sets the "guild_id" field.
+func (m *GuildMutation) SetGuildID(s string) {
+	m.guild_id = &s
+}
+
+// GuildID returns the value of the "guild_id" field in the mutation.
+func (m *GuildMutation) GuildID() (r string, exists bool) {
+	v := m.guild_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGuildID returns the old "guild_id" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldGuildID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGuildID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGuildID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGuildID: %w", err)
+	}
+	return oldValue.GuildID, nil
+}
+
+// ResetGuildID resets all changes to the "guild_id" field.
+func (m *GuildMutation) ResetGuildID() {
+	m.guild_id = nil
 }
 
 // SetName sets the "name" field.
-func (m *UserMutation) SetName(s string) {
+func (m *GuildMutation) SetName(s string) {
 	m.name = &s
 }
 
 // Name returns the value of the "name" field in the mutation.
-func (m *UserMutation) Name() (r string, exists bool) {
+func (m *GuildMutation) Name() (r string, exists bool) {
 	v := m.name
 	if v == nil {
 		return
@@ -209,10 +279,10 @@ func (m *UserMutation) Name() (r string, exists bool) {
 	return *v, true
 }
 
-// OldName returns the old "name" field's value of the User entity.
-// If the User object wasn't provided to the builder, the object is fetched from the database.
+// OldName returns the old "name" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UserMutation) OldName(ctx context.Context) (v string, err error) {
+func (m *GuildMutation) OldName(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldName is only allowed on UpdateOne operations")
 	}
@@ -227,35 +297,603 @@ func (m *UserMutation) OldName(ctx context.Context) (v string, err error) {
 }
 
 // ResetName resets all changes to the "name" field.
-func (m *UserMutation) ResetName() {
+func (m *GuildMutation) ResetName() {
 	m.name = nil
 }
 
-// Where appends a list predicates to the UserMutation builder.
-func (m *UserMutation) Where(ps ...predicate.User) {
+// SetFeatures sets the "features" field.
+func (m *GuildMutation) SetFeatures(s []string) {
+	m.features = &s
+}
+
+// Features returns the value of the "features" field in the mutation.
+func (m *GuildMutation) Features() (r []string, exists bool) {
+	v := m.features
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeatures returns the old "features" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldFeatures(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeatures is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeatures requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeatures: %w", err)
+	}
+	return oldValue.Features, nil
+}
+
+// ClearFeatures clears the value of the "features" field.
+func (m *GuildMutation) ClearFeatures() {
+	m.features = nil
+	m.clearedFields[guild.FieldFeatures] = struct{}{}
+}
+
+// FeaturesCleared returns if the "features" field was cleared in this mutation.
+func (m *GuildMutation) FeaturesCleared() bool {
+	_, ok := m.clearedFields[guild.FieldFeatures]
+	return ok
+}
+
+// ResetFeatures resets all changes to the "features" field.
+func (m *GuildMutation) ResetFeatures() {
+	m.features = nil
+	delete(m.clearedFields, guild.FieldFeatures)
+}
+
+// SetIconHash sets the "icon_hash" field.
+func (m *GuildMutation) SetIconHash(s string) {
+	m.icon_hash = &s
+}
+
+// IconHash returns the value of the "icon_hash" field in the mutation.
+func (m *GuildMutation) IconHash() (r string, exists bool) {
+	v := m.icon_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIconHash returns the old "icon_hash" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldIconHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIconHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIconHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIconHash: %w", err)
+	}
+	return oldValue.IconHash, nil
+}
+
+// ClearIconHash clears the value of the "icon_hash" field.
+func (m *GuildMutation) ClearIconHash() {
+	m.icon_hash = nil
+	m.clearedFields[guild.FieldIconHash] = struct{}{}
+}
+
+// IconHashCleared returns if the "icon_hash" field was cleared in this mutation.
+func (m *GuildMutation) IconHashCleared() bool {
+	_, ok := m.clearedFields[guild.FieldIconHash]
+	return ok
+}
+
+// ResetIconHash resets all changes to the "icon_hash" field.
+func (m *GuildMutation) ResetIconHash() {
+	m.icon_hash = nil
+	delete(m.clearedFields, guild.FieldIconHash)
+}
+
+// SetIconURL sets the "icon_url" field.
+func (m *GuildMutation) SetIconURL(s string) {
+	m.icon_url = &s
+}
+
+// IconURL returns the value of the "icon_url" field in the mutation.
+func (m *GuildMutation) IconURL() (r string, exists bool) {
+	v := m.icon_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIconURL returns the old "icon_url" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldIconURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIconURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIconURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIconURL: %w", err)
+	}
+	return oldValue.IconURL, nil
+}
+
+// ResetIconURL resets all changes to the "icon_url" field.
+func (m *GuildMutation) ResetIconURL() {
+	m.icon_url = nil
+}
+
+// SetJoinedAt sets the "joined_at" field.
+func (m *GuildMutation) SetJoinedAt(t time.Time) {
+	m.joined_at = &t
+}
+
+// JoinedAt returns the value of the "joined_at" field in the mutation.
+func (m *GuildMutation) JoinedAt() (r time.Time, exists bool) {
+	v := m.joined_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJoinedAt returns the old "joined_at" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldJoinedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJoinedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJoinedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJoinedAt: %w", err)
+	}
+	return oldValue.JoinedAt, nil
+}
+
+// ResetJoinedAt resets all changes to the "joined_at" field.
+func (m *GuildMutation) ResetJoinedAt() {
+	m.joined_at = nil
+}
+
+// SetLarge sets the "large" field.
+func (m *GuildMutation) SetLarge(b bool) {
+	m.large = &b
+}
+
+// Large returns the value of the "large" field in the mutation.
+func (m *GuildMutation) Large() (r bool, exists bool) {
+	v := m.large
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLarge returns the old "large" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldLarge(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLarge is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLarge requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLarge: %w", err)
+	}
+	return oldValue.Large, nil
+}
+
+// ClearLarge clears the value of the "large" field.
+func (m *GuildMutation) ClearLarge() {
+	m.large = nil
+	m.clearedFields[guild.FieldLarge] = struct{}{}
+}
+
+// LargeCleared returns if the "large" field was cleared in this mutation.
+func (m *GuildMutation) LargeCleared() bool {
+	_, ok := m.clearedFields[guild.FieldLarge]
+	return ok
+}
+
+// ResetLarge resets all changes to the "large" field.
+func (m *GuildMutation) ResetLarge() {
+	m.large = nil
+	delete(m.clearedFields, guild.FieldLarge)
+}
+
+// SetMemberCount sets the "member_count" field.
+func (m *GuildMutation) SetMemberCount(i int) {
+	m.member_count = &i
+	m.addmember_count = nil
+}
+
+// MemberCount returns the value of the "member_count" field in the mutation.
+func (m *GuildMutation) MemberCount() (r int, exists bool) {
+	v := m.member_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMemberCount returns the old "member_count" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldMemberCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMemberCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMemberCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMemberCount: %w", err)
+	}
+	return oldValue.MemberCount, nil
+}
+
+// AddMemberCount adds i to the "member_count" field.
+func (m *GuildMutation) AddMemberCount(i int) {
+	if m.addmember_count != nil {
+		*m.addmember_count += i
+	} else {
+		m.addmember_count = &i
+	}
+}
+
+// AddedMemberCount returns the value that was added to the "member_count" field in this mutation.
+func (m *GuildMutation) AddedMemberCount() (r int, exists bool) {
+	v := m.addmember_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMemberCount clears the value of the "member_count" field.
+func (m *GuildMutation) ClearMemberCount() {
+	m.member_count = nil
+	m.addmember_count = nil
+	m.clearedFields[guild.FieldMemberCount] = struct{}{}
+}
+
+// MemberCountCleared returns if the "member_count" field was cleared in this mutation.
+func (m *GuildMutation) MemberCountCleared() bool {
+	_, ok := m.clearedFields[guild.FieldMemberCount]
+	return ok
+}
+
+// ResetMemberCount resets all changes to the "member_count" field.
+func (m *GuildMutation) ResetMemberCount() {
+	m.member_count = nil
+	m.addmember_count = nil
+	delete(m.clearedFields, guild.FieldMemberCount)
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (m *GuildMutation) SetOwnerID(s string) {
+	m.owner_id = &s
+}
+
+// OwnerID returns the value of the "owner_id" field in the mutation.
+func (m *GuildMutation) OwnerID() (r string, exists bool) {
+	v := m.owner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerID returns the old "owner_id" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldOwnerID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerID: %w", err)
+	}
+	return oldValue.OwnerID, nil
+}
+
+// ResetOwnerID resets all changes to the "owner_id" field.
+func (m *GuildMutation) ResetOwnerID() {
+	m.owner_id = nil
+}
+
+// SetPermissions sets the "permissions" field.
+func (m *GuildMutation) SetPermissions(u uint64) {
+	m.permissions = &u
+	m.addpermissions = nil
+}
+
+// Permissions returns the value of the "permissions" field in the mutation.
+func (m *GuildMutation) Permissions() (r uint64, exists bool) {
+	v := m.permissions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPermissions returns the old "permissions" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldPermissions(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPermissions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPermissions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPermissions: %w", err)
+	}
+	return oldValue.Permissions, nil
+}
+
+// AddPermissions adds u to the "permissions" field.
+func (m *GuildMutation) AddPermissions(u int64) {
+	if m.addpermissions != nil {
+		*m.addpermissions += u
+	} else {
+		m.addpermissions = &u
+	}
+}
+
+// AddedPermissions returns the value that was added to the "permissions" field in this mutation.
+func (m *GuildMutation) AddedPermissions() (r int64, exists bool) {
+	v := m.addpermissions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPermissions clears the value of the "permissions" field.
+func (m *GuildMutation) ClearPermissions() {
+	m.permissions = nil
+	m.addpermissions = nil
+	m.clearedFields[guild.FieldPermissions] = struct{}{}
+}
+
+// PermissionsCleared returns if the "permissions" field was cleared in this mutation.
+func (m *GuildMutation) PermissionsCleared() bool {
+	_, ok := m.clearedFields[guild.FieldPermissions]
+	return ok
+}
+
+// ResetPermissions resets all changes to the "permissions" field.
+func (m *GuildMutation) ResetPermissions() {
+	m.permissions = nil
+	m.addpermissions = nil
+	delete(m.clearedFields, guild.FieldPermissions)
+}
+
+// SetRegion sets the "region" field.
+func (m *GuildMutation) SetRegion(s string) {
+	m.region = &s
+}
+
+// Region returns the value of the "region" field in the mutation.
+func (m *GuildMutation) Region() (r string, exists bool) {
+	v := m.region
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRegion returns the old "region" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldRegion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRegion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRegion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRegion: %w", err)
+	}
+	return oldValue.Region, nil
+}
+
+// ClearRegion clears the value of the "region" field.
+func (m *GuildMutation) ClearRegion() {
+	m.region = nil
+	m.clearedFields[guild.FieldRegion] = struct{}{}
+}
+
+// RegionCleared returns if the "region" field was cleared in this mutation.
+func (m *GuildMutation) RegionCleared() bool {
+	_, ok := m.clearedFields[guild.FieldRegion]
+	return ok
+}
+
+// ResetRegion resets all changes to the "region" field.
+func (m *GuildMutation) ResetRegion() {
+	m.region = nil
+	delete(m.clearedFields, guild.FieldRegion)
+}
+
+// SetSystemChannelFlags sets the "system_channel_flags" field.
+func (m *GuildMutation) SetSystemChannelFlags(s string) {
+	m.system_channel_flags = &s
+}
+
+// SystemChannelFlags returns the value of the "system_channel_flags" field in the mutation.
+func (m *GuildMutation) SystemChannelFlags() (r string, exists bool) {
+	v := m.system_channel_flags
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSystemChannelFlags returns the old "system_channel_flags" field's value of the Guild entity.
+// If the Guild object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildMutation) OldSystemChannelFlags(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSystemChannelFlags is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSystemChannelFlags requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSystemChannelFlags: %w", err)
+	}
+	return oldValue.SystemChannelFlags, nil
+}
+
+// ClearSystemChannelFlags clears the value of the "system_channel_flags" field.
+func (m *GuildMutation) ClearSystemChannelFlags() {
+	m.system_channel_flags = nil
+	m.clearedFields[guild.FieldSystemChannelFlags] = struct{}{}
+}
+
+// SystemChannelFlagsCleared returns if the "system_channel_flags" field was cleared in this mutation.
+func (m *GuildMutation) SystemChannelFlagsCleared() bool {
+	_, ok := m.clearedFields[guild.FieldSystemChannelFlags]
+	return ok
+}
+
+// ResetSystemChannelFlags resets all changes to the "system_channel_flags" field.
+func (m *GuildMutation) ResetSystemChannelFlags() {
+	m.system_channel_flags = nil
+	delete(m.clearedFields, guild.FieldSystemChannelFlags)
+}
+
+// SetGuildSettingsID sets the "guild_settings" edge to the GuildSettings entity by id.
+func (m *GuildMutation) SetGuildSettingsID(id int) {
+	m.guild_settings = &id
+}
+
+// ClearGuildSettings clears the "guild_settings" edge to the GuildSettings entity.
+func (m *GuildMutation) ClearGuildSettings() {
+	m.clearedguild_settings = true
+}
+
+// GuildSettingsCleared reports if the "guild_settings" edge to the GuildSettings entity was cleared.
+func (m *GuildMutation) GuildSettingsCleared() bool {
+	return m.clearedguild_settings
+}
+
+// GuildSettingsID returns the "guild_settings" edge ID in the mutation.
+func (m *GuildMutation) GuildSettingsID() (id int, exists bool) {
+	if m.guild_settings != nil {
+		return *m.guild_settings, true
+	}
+	return
+}
+
+// GuildSettingsIDs returns the "guild_settings" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// GuildSettingsID instead. It exists only for internal usage by the builders.
+func (m *GuildMutation) GuildSettingsIDs() (ids []int) {
+	if id := m.guild_settings; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetGuildSettings resets all changes to the "guild_settings" edge.
+func (m *GuildMutation) ResetGuildSettings() {
+	m.guild_settings = nil
+	m.clearedguild_settings = false
+}
+
+// Where appends a list predicates to the GuildMutation builder.
+func (m *GuildMutation) Where(ps ...predicate.Guild) {
 	m.predicates = append(m.predicates, ps...)
 }
 
 // Op returns the operation name.
-func (m *UserMutation) Op() Op {
+func (m *GuildMutation) Op() Op {
 	return m.op
 }
 
-// Type returns the node type of this mutation (User).
-func (m *UserMutation) Type() string {
+// Type returns the node type of this mutation (Guild).
+func (m *GuildMutation) Type() string {
 	return m.typ
 }
 
 // Fields returns all fields that were changed during this mutation. Note that in
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
-func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 2)
-	if m.age != nil {
-		fields = append(fields, user.FieldAge)
+func (m *GuildMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.create_time != nil {
+		fields = append(fields, guild.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, guild.FieldUpdateTime)
+	}
+	if m.guild_id != nil {
+		fields = append(fields, guild.FieldGuildID)
 	}
 	if m.name != nil {
-		fields = append(fields, user.FieldName)
+		fields = append(fields, guild.FieldName)
+	}
+	if m.features != nil {
+		fields = append(fields, guild.FieldFeatures)
+	}
+	if m.icon_hash != nil {
+		fields = append(fields, guild.FieldIconHash)
+	}
+	if m.icon_url != nil {
+		fields = append(fields, guild.FieldIconURL)
+	}
+	if m.joined_at != nil {
+		fields = append(fields, guild.FieldJoinedAt)
+	}
+	if m.large != nil {
+		fields = append(fields, guild.FieldLarge)
+	}
+	if m.member_count != nil {
+		fields = append(fields, guild.FieldMemberCount)
+	}
+	if m.owner_id != nil {
+		fields = append(fields, guild.FieldOwnerID)
+	}
+	if m.permissions != nil {
+		fields = append(fields, guild.FieldPermissions)
+	}
+	if m.region != nil {
+		fields = append(fields, guild.FieldRegion)
+	}
+	if m.system_channel_flags != nil {
+		fields = append(fields, guild.FieldSystemChannelFlags)
 	}
 	return fields
 }
@@ -263,12 +901,36 @@ func (m *UserMutation) Fields() []string {
 // Field returns the value of a field with the given name. The second boolean
 // return value indicates that this field was not set, or was not defined in the
 // schema.
-func (m *UserMutation) Field(name string) (ent.Value, bool) {
+func (m *GuildMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case user.FieldAge:
-		return m.Age()
-	case user.FieldName:
+	case guild.FieldCreateTime:
+		return m.CreateTime()
+	case guild.FieldUpdateTime:
+		return m.UpdateTime()
+	case guild.FieldGuildID:
+		return m.GuildID()
+	case guild.FieldName:
 		return m.Name()
+	case guild.FieldFeatures:
+		return m.Features()
+	case guild.FieldIconHash:
+		return m.IconHash()
+	case guild.FieldIconURL:
+		return m.IconURL()
+	case guild.FieldJoinedAt:
+		return m.JoinedAt()
+	case guild.FieldLarge:
+		return m.Large()
+	case guild.FieldMemberCount:
+		return m.MemberCount()
+	case guild.FieldOwnerID:
+		return m.OwnerID()
+	case guild.FieldPermissions:
+		return m.Permissions()
+	case guild.FieldRegion:
+		return m.Region()
+	case guild.FieldSystemChannelFlags:
+		return m.SystemChannelFlags()
 	}
 	return nil, false
 }
@@ -276,45 +938,156 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 // OldField returns the old value of the field from the database. An error is
 // returned if the mutation operation is not UpdateOne, or the query to the
 // database failed.
-func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+func (m *GuildMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case user.FieldAge:
-		return m.OldAge(ctx)
-	case user.FieldName:
+	case guild.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case guild.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case guild.FieldGuildID:
+		return m.OldGuildID(ctx)
+	case guild.FieldName:
 		return m.OldName(ctx)
+	case guild.FieldFeatures:
+		return m.OldFeatures(ctx)
+	case guild.FieldIconHash:
+		return m.OldIconHash(ctx)
+	case guild.FieldIconURL:
+		return m.OldIconURL(ctx)
+	case guild.FieldJoinedAt:
+		return m.OldJoinedAt(ctx)
+	case guild.FieldLarge:
+		return m.OldLarge(ctx)
+	case guild.FieldMemberCount:
+		return m.OldMemberCount(ctx)
+	case guild.FieldOwnerID:
+		return m.OldOwnerID(ctx)
+	case guild.FieldPermissions:
+		return m.OldPermissions(ctx)
+	case guild.FieldRegion:
+		return m.OldRegion(ctx)
+	case guild.FieldSystemChannelFlags:
+		return m.OldSystemChannelFlags(ctx)
 	}
-	return nil, fmt.Errorf("unknown User field %s", name)
+	return nil, fmt.Errorf("unknown Guild field %s", name)
 }
 
 // SetField sets the value of a field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *UserMutation) SetField(name string, value ent.Value) error {
+func (m *GuildMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case user.FieldAge:
-		v, ok := value.(int)
+	case guild.FieldCreateTime:
+		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetAge(v)
+		m.SetCreateTime(v)
 		return nil
-	case user.FieldName:
+	case guild.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case guild.FieldGuildID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGuildID(v)
+		return nil
+	case guild.FieldName:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetName(v)
 		return nil
+	case guild.FieldFeatures:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeatures(v)
+		return nil
+	case guild.FieldIconHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIconHash(v)
+		return nil
+	case guild.FieldIconURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIconURL(v)
+		return nil
+	case guild.FieldJoinedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJoinedAt(v)
+		return nil
+	case guild.FieldLarge:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLarge(v)
+		return nil
+	case guild.FieldMemberCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMemberCount(v)
+		return nil
+	case guild.FieldOwnerID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerID(v)
+		return nil
+	case guild.FieldPermissions:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPermissions(v)
+		return nil
+	case guild.FieldRegion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRegion(v)
+		return nil
+	case guild.FieldSystemChannelFlags:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSystemChannelFlags(v)
+		return nil
 	}
-	return fmt.Errorf("unknown User field %s", name)
+	return fmt.Errorf("unknown Guild field %s", name)
 }
 
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
-func (m *UserMutation) AddedFields() []string {
+func (m *GuildMutation) AddedFields() []string {
 	var fields []string
-	if m.addage != nil {
-		fields = append(fields, user.FieldAge)
+	if m.addmember_count != nil {
+		fields = append(fields, guild.FieldMemberCount)
+	}
+	if m.addpermissions != nil {
+		fields = append(fields, guild.FieldPermissions)
 	}
 	return fields
 }
@@ -322,10 +1095,12 @@ func (m *UserMutation) AddedFields() []string {
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
-func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
+func (m *GuildMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case user.FieldAge:
-		return m.AddedAge()
+	case guild.FieldMemberCount:
+		return m.AddedMemberCount()
+	case guild.FieldPermissions:
+		return m.AddedPermissions()
 	}
 	return nil, false
 }
@@ -333,96 +1108,955 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 // AddField adds the value to the field with the given name. It returns an error if
 // the field is not defined in the schema, or if the type mismatched the field
 // type.
-func (m *UserMutation) AddField(name string, value ent.Value) error {
+func (m *GuildMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case user.FieldAge:
+	case guild.FieldMemberCount:
 		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.AddAge(v)
+		m.AddMemberCount(v)
+		return nil
+	case guild.FieldPermissions:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPermissions(v)
 		return nil
 	}
-	return fmt.Errorf("unknown User numeric field %s", name)
+	return fmt.Errorf("unknown Guild numeric field %s", name)
 }
 
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
-func (m *UserMutation) ClearedFields() []string {
-	return nil
+func (m *GuildMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(guild.FieldFeatures) {
+		fields = append(fields, guild.FieldFeatures)
+	}
+	if m.FieldCleared(guild.FieldIconHash) {
+		fields = append(fields, guild.FieldIconHash)
+	}
+	if m.FieldCleared(guild.FieldLarge) {
+		fields = append(fields, guild.FieldLarge)
+	}
+	if m.FieldCleared(guild.FieldMemberCount) {
+		fields = append(fields, guild.FieldMemberCount)
+	}
+	if m.FieldCleared(guild.FieldPermissions) {
+		fields = append(fields, guild.FieldPermissions)
+	}
+	if m.FieldCleared(guild.FieldRegion) {
+		fields = append(fields, guild.FieldRegion)
+	}
+	if m.FieldCleared(guild.FieldSystemChannelFlags) {
+		fields = append(fields, guild.FieldSystemChannelFlags)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
 // cleared in this mutation.
-func (m *UserMutation) FieldCleared(name string) bool {
+func (m *GuildMutation) FieldCleared(name string) bool {
 	_, ok := m.clearedFields[name]
 	return ok
 }
 
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
-func (m *UserMutation) ClearField(name string) error {
-	return fmt.Errorf("unknown User nullable field %s", name)
+func (m *GuildMutation) ClearField(name string) error {
+	switch name {
+	case guild.FieldFeatures:
+		m.ClearFeatures()
+		return nil
+	case guild.FieldIconHash:
+		m.ClearIconHash()
+		return nil
+	case guild.FieldLarge:
+		m.ClearLarge()
+		return nil
+	case guild.FieldMemberCount:
+		m.ClearMemberCount()
+		return nil
+	case guild.FieldPermissions:
+		m.ClearPermissions()
+		return nil
+	case guild.FieldRegion:
+		m.ClearRegion()
+		return nil
+	case guild.FieldSystemChannelFlags:
+		m.ClearSystemChannelFlags()
+		return nil
+	}
+	return fmt.Errorf("unknown Guild nullable field %s", name)
 }
 
 // ResetField resets all changes in the mutation for the field with the given name.
 // It returns an error if the field is not defined in the schema.
-func (m *UserMutation) ResetField(name string) error {
+func (m *GuildMutation) ResetField(name string) error {
 	switch name {
-	case user.FieldAge:
-		m.ResetAge()
+	case guild.FieldCreateTime:
+		m.ResetCreateTime()
 		return nil
-	case user.FieldName:
+	case guild.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case guild.FieldGuildID:
+		m.ResetGuildID()
+		return nil
+	case guild.FieldName:
 		m.ResetName()
 		return nil
+	case guild.FieldFeatures:
+		m.ResetFeatures()
+		return nil
+	case guild.FieldIconHash:
+		m.ResetIconHash()
+		return nil
+	case guild.FieldIconURL:
+		m.ResetIconURL()
+		return nil
+	case guild.FieldJoinedAt:
+		m.ResetJoinedAt()
+		return nil
+	case guild.FieldLarge:
+		m.ResetLarge()
+		return nil
+	case guild.FieldMemberCount:
+		m.ResetMemberCount()
+		return nil
+	case guild.FieldOwnerID:
+		m.ResetOwnerID()
+		return nil
+	case guild.FieldPermissions:
+		m.ResetPermissions()
+		return nil
+	case guild.FieldRegion:
+		m.ResetRegion()
+		return nil
+	case guild.FieldSystemChannelFlags:
+		m.ResetSystemChannelFlags()
+		return nil
 	}
-	return fmt.Errorf("unknown User field %s", name)
+	return fmt.Errorf("unknown Guild field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
-func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *GuildMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.guild_settings != nil {
+		edges = append(edges, guild.EdgeGuildSettings)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
-func (m *UserMutation) AddedIDs(name string) []ent.Value {
+func (m *GuildMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case guild.EdgeGuildSettings:
+		if id := m.guild_settings; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
-func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *GuildMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
-func (m *UserMutation) RemovedIDs(name string) []ent.Value {
+func (m *GuildMutation) RemovedIDs(name string) []ent.Value {
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+func (m *GuildMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedguild_settings {
+		edges = append(edges, guild.EdgeGuildSettings)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
-func (m *UserMutation) EdgeCleared(name string) bool {
+func (m *GuildMutation) EdgeCleared(name string) bool {
+	switch name {
+	case guild.EdgeGuildSettings:
+		return m.clearedguild_settings
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
-func (m *UserMutation) ClearEdge(name string) error {
-	return fmt.Errorf("unknown User unique edge %s", name)
+func (m *GuildMutation) ClearEdge(name string) error {
+	switch name {
+	case guild.EdgeGuildSettings:
+		m.ClearGuildSettings()
+		return nil
+	}
+	return fmt.Errorf("unknown Guild unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
-func (m *UserMutation) ResetEdge(name string) error {
-	return fmt.Errorf("unknown User edge %s", name)
+func (m *GuildMutation) ResetEdge(name string) error {
+	switch name {
+	case guild.EdgeGuildSettings:
+		m.ResetGuildSettings()
+		return nil
+	}
+	return fmt.Errorf("unknown Guild edge %s", name)
+}
+
+// GuildSettingsMutation represents an operation that mutates the GuildSettings nodes in the graph.
+type GuildSettingsMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *int
+	create_time           *time.Time
+	update_time           *time.Time
+	enabled               *bool
+	default_max_clones    *int
+	adddefault_max_clones *int
+	regex_match           *string
+	contact_email         *string
+	clearedFields         map[string]struct{}
+	guild                 *int
+	clearedguild          bool
+	done                  bool
+	oldValue              func(context.Context) (*GuildSettings, error)
+	predicates            []predicate.GuildSettings
+}
+
+var _ ent.Mutation = (*GuildSettingsMutation)(nil)
+
+// guildsettingsOption allows management of the mutation configuration using functional options.
+type guildsettingsOption func(*GuildSettingsMutation)
+
+// newGuildSettingsMutation creates new mutation for the GuildSettings entity.
+func newGuildSettingsMutation(c config, op Op, opts ...guildsettingsOption) *GuildSettingsMutation {
+	m := &GuildSettingsMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeGuildSettings,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withGuildSettingsID sets the ID field of the mutation.
+func withGuildSettingsID(id int) guildsettingsOption {
+	return func(m *GuildSettingsMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *GuildSettings
+		)
+		m.oldValue = func(ctx context.Context) (*GuildSettings, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().GuildSettings.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withGuildSettings sets the old GuildSettings of the mutation.
+func withGuildSettings(node *GuildSettings) guildsettingsOption {
+	return func(m *GuildSettingsMutation) {
+		m.oldValue = func(context.Context) (*GuildSettings, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m GuildSettingsMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m GuildSettingsMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *GuildSettingsMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *GuildSettingsMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().GuildSettings.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *GuildSettingsMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *GuildSettingsMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *GuildSettingsMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *GuildSettingsMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *GuildSettingsMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *GuildSettingsMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *GuildSettingsMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *GuildSettingsMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *GuildSettingsMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetDefaultMaxClones sets the "default_max_clones" field.
+func (m *GuildSettingsMutation) SetDefaultMaxClones(i int) {
+	m.default_max_clones = &i
+	m.adddefault_max_clones = nil
+}
+
+// DefaultMaxClones returns the value of the "default_max_clones" field in the mutation.
+func (m *GuildSettingsMutation) DefaultMaxClones() (r int, exists bool) {
+	v := m.default_max_clones
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultMaxClones returns the old "default_max_clones" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldDefaultMaxClones(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultMaxClones is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultMaxClones requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultMaxClones: %w", err)
+	}
+	return oldValue.DefaultMaxClones, nil
+}
+
+// AddDefaultMaxClones adds i to the "default_max_clones" field.
+func (m *GuildSettingsMutation) AddDefaultMaxClones(i int) {
+	if m.adddefault_max_clones != nil {
+		*m.adddefault_max_clones += i
+	} else {
+		m.adddefault_max_clones = &i
+	}
+}
+
+// AddedDefaultMaxClones returns the value that was added to the "default_max_clones" field in this mutation.
+func (m *GuildSettingsMutation) AddedDefaultMaxClones() (r int, exists bool) {
+	v := m.adddefault_max_clones
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDefaultMaxClones clears the value of the "default_max_clones" field.
+func (m *GuildSettingsMutation) ClearDefaultMaxClones() {
+	m.default_max_clones = nil
+	m.adddefault_max_clones = nil
+	m.clearedFields[guildsettings.FieldDefaultMaxClones] = struct{}{}
+}
+
+// DefaultMaxClonesCleared returns if the "default_max_clones" field was cleared in this mutation.
+func (m *GuildSettingsMutation) DefaultMaxClonesCleared() bool {
+	_, ok := m.clearedFields[guildsettings.FieldDefaultMaxClones]
+	return ok
+}
+
+// ResetDefaultMaxClones resets all changes to the "default_max_clones" field.
+func (m *GuildSettingsMutation) ResetDefaultMaxClones() {
+	m.default_max_clones = nil
+	m.adddefault_max_clones = nil
+	delete(m.clearedFields, guildsettings.FieldDefaultMaxClones)
+}
+
+// SetRegexMatch sets the "regex_match" field.
+func (m *GuildSettingsMutation) SetRegexMatch(s string) {
+	m.regex_match = &s
+}
+
+// RegexMatch returns the value of the "regex_match" field in the mutation.
+func (m *GuildSettingsMutation) RegexMatch() (r string, exists bool) {
+	v := m.regex_match
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRegexMatch returns the old "regex_match" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldRegexMatch(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRegexMatch is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRegexMatch requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRegexMatch: %w", err)
+	}
+	return oldValue.RegexMatch, nil
+}
+
+// ClearRegexMatch clears the value of the "regex_match" field.
+func (m *GuildSettingsMutation) ClearRegexMatch() {
+	m.regex_match = nil
+	m.clearedFields[guildsettings.FieldRegexMatch] = struct{}{}
+}
+
+// RegexMatchCleared returns if the "regex_match" field was cleared in this mutation.
+func (m *GuildSettingsMutation) RegexMatchCleared() bool {
+	_, ok := m.clearedFields[guildsettings.FieldRegexMatch]
+	return ok
+}
+
+// ResetRegexMatch resets all changes to the "regex_match" field.
+func (m *GuildSettingsMutation) ResetRegexMatch() {
+	m.regex_match = nil
+	delete(m.clearedFields, guildsettings.FieldRegexMatch)
+}
+
+// SetContactEmail sets the "contact_email" field.
+func (m *GuildSettingsMutation) SetContactEmail(s string) {
+	m.contact_email = &s
+}
+
+// ContactEmail returns the value of the "contact_email" field in the mutation.
+func (m *GuildSettingsMutation) ContactEmail() (r string, exists bool) {
+	v := m.contact_email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContactEmail returns the old "contact_email" field's value of the GuildSettings entity.
+// If the GuildSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GuildSettingsMutation) OldContactEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContactEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContactEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContactEmail: %w", err)
+	}
+	return oldValue.ContactEmail, nil
+}
+
+// ClearContactEmail clears the value of the "contact_email" field.
+func (m *GuildSettingsMutation) ClearContactEmail() {
+	m.contact_email = nil
+	m.clearedFields[guildsettings.FieldContactEmail] = struct{}{}
+}
+
+// ContactEmailCleared returns if the "contact_email" field was cleared in this mutation.
+func (m *GuildSettingsMutation) ContactEmailCleared() bool {
+	_, ok := m.clearedFields[guildsettings.FieldContactEmail]
+	return ok
+}
+
+// ResetContactEmail resets all changes to the "contact_email" field.
+func (m *GuildSettingsMutation) ResetContactEmail() {
+	m.contact_email = nil
+	delete(m.clearedFields, guildsettings.FieldContactEmail)
+}
+
+// SetGuildID sets the "guild" edge to the Guild entity by id.
+func (m *GuildSettingsMutation) SetGuildID(id int) {
+	m.guild = &id
+}
+
+// ClearGuild clears the "guild" edge to the Guild entity.
+func (m *GuildSettingsMutation) ClearGuild() {
+	m.clearedguild = true
+}
+
+// GuildCleared reports if the "guild" edge to the Guild entity was cleared.
+func (m *GuildSettingsMutation) GuildCleared() bool {
+	return m.clearedguild
+}
+
+// GuildID returns the "guild" edge ID in the mutation.
+func (m *GuildSettingsMutation) GuildID() (id int, exists bool) {
+	if m.guild != nil {
+		return *m.guild, true
+	}
+	return
+}
+
+// GuildIDs returns the "guild" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// GuildID instead. It exists only for internal usage by the builders.
+func (m *GuildSettingsMutation) GuildIDs() (ids []int) {
+	if id := m.guild; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetGuild resets all changes to the "guild" edge.
+func (m *GuildSettingsMutation) ResetGuild() {
+	m.guild = nil
+	m.clearedguild = false
+}
+
+// Where appends a list predicates to the GuildSettingsMutation builder.
+func (m *GuildSettingsMutation) Where(ps ...predicate.GuildSettings) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// Op returns the operation name.
+func (m *GuildSettingsMutation) Op() Op {
+	return m.op
+}
+
+// Type returns the node type of this mutation (GuildSettings).
+func (m *GuildSettingsMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *GuildSettingsMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.create_time != nil {
+		fields = append(fields, guildsettings.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, guildsettings.FieldUpdateTime)
+	}
+	if m.enabled != nil {
+		fields = append(fields, guildsettings.FieldEnabled)
+	}
+	if m.default_max_clones != nil {
+		fields = append(fields, guildsettings.FieldDefaultMaxClones)
+	}
+	if m.regex_match != nil {
+		fields = append(fields, guildsettings.FieldRegexMatch)
+	}
+	if m.contact_email != nil {
+		fields = append(fields, guildsettings.FieldContactEmail)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *GuildSettingsMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case guildsettings.FieldCreateTime:
+		return m.CreateTime()
+	case guildsettings.FieldUpdateTime:
+		return m.UpdateTime()
+	case guildsettings.FieldEnabled:
+		return m.Enabled()
+	case guildsettings.FieldDefaultMaxClones:
+		return m.DefaultMaxClones()
+	case guildsettings.FieldRegexMatch:
+		return m.RegexMatch()
+	case guildsettings.FieldContactEmail:
+		return m.ContactEmail()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *GuildSettingsMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case guildsettings.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case guildsettings.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case guildsettings.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case guildsettings.FieldDefaultMaxClones:
+		return m.OldDefaultMaxClones(ctx)
+	case guildsettings.FieldRegexMatch:
+		return m.OldRegexMatch(ctx)
+	case guildsettings.FieldContactEmail:
+		return m.OldContactEmail(ctx)
+	}
+	return nil, fmt.Errorf("unknown GuildSettings field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *GuildSettingsMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case guildsettings.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case guildsettings.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case guildsettings.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case guildsettings.FieldDefaultMaxClones:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultMaxClones(v)
+		return nil
+	case guildsettings.FieldRegexMatch:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRegexMatch(v)
+		return nil
+	case guildsettings.FieldContactEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContactEmail(v)
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *GuildSettingsMutation) AddedFields() []string {
+	var fields []string
+	if m.adddefault_max_clones != nil {
+		fields = append(fields, guildsettings.FieldDefaultMaxClones)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *GuildSettingsMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case guildsettings.FieldDefaultMaxClones:
+		return m.AddedDefaultMaxClones()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *GuildSettingsMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case guildsettings.FieldDefaultMaxClones:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDefaultMaxClones(v)
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *GuildSettingsMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(guildsettings.FieldDefaultMaxClones) {
+		fields = append(fields, guildsettings.FieldDefaultMaxClones)
+	}
+	if m.FieldCleared(guildsettings.FieldRegexMatch) {
+		fields = append(fields, guildsettings.FieldRegexMatch)
+	}
+	if m.FieldCleared(guildsettings.FieldContactEmail) {
+		fields = append(fields, guildsettings.FieldContactEmail)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *GuildSettingsMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *GuildSettingsMutation) ClearField(name string) error {
+	switch name {
+	case guildsettings.FieldDefaultMaxClones:
+		m.ClearDefaultMaxClones()
+		return nil
+	case guildsettings.FieldRegexMatch:
+		m.ClearRegexMatch()
+		return nil
+	case guildsettings.FieldContactEmail:
+		m.ClearContactEmail()
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *GuildSettingsMutation) ResetField(name string) error {
+	switch name {
+	case guildsettings.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case guildsettings.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case guildsettings.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case guildsettings.FieldDefaultMaxClones:
+		m.ResetDefaultMaxClones()
+		return nil
+	case guildsettings.FieldRegexMatch:
+		m.ResetRegexMatch()
+		return nil
+	case guildsettings.FieldContactEmail:
+		m.ResetContactEmail()
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *GuildSettingsMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.guild != nil {
+		edges = append(edges, guildsettings.EdgeGuild)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *GuildSettingsMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case guildsettings.EdgeGuild:
+		if id := m.guild; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *GuildSettingsMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *GuildSettingsMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *GuildSettingsMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedguild {
+		edges = append(edges, guildsettings.EdgeGuild)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *GuildSettingsMutation) EdgeCleared(name string) bool {
+	switch name {
+	case guildsettings.EdgeGuild:
+		return m.clearedguild
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *GuildSettingsMutation) ClearEdge(name string) error {
+	switch name {
+	case guildsettings.EdgeGuild:
+		m.ClearGuild()
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *GuildSettingsMutation) ResetEdge(name string) error {
+	switch name {
+	case guildsettings.EdgeGuild:
+		m.ResetGuild()
+		return nil
+	}
+	return fmt.Errorf("unknown GuildSettings edge %s", name)
 }

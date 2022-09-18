@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"log"
 
-	"entgo.io/bug/ent/migrate"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/migrate"
 
-	"entgo.io/bug/ent/user"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/guild"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/guildsettings"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // Client is the client that holds all ent builders.
@@ -21,8 +23,12 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
-	// User is the client for interacting with the User builders.
-	User *UserClient
+	// Guild is the client for interacting with the Guild builders.
+	Guild *GuildClient
+	// GuildSettings is the client for interacting with the GuildSettings builders.
+	GuildSettings *GuildSettingsClient
+	// additional fields for node api
+	tables tables
 }
 
 // NewClient creates a new client configured with the given options.
@@ -36,7 +42,8 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
-	c.User = NewUserClient(c.config)
+	c.Guild = NewGuildClient(c.config)
+	c.GuildSettings = NewGuildSettingsClient(c.config)
 }
 
 // Open opens a database/sql.DB specified by the driver name and
@@ -68,9 +75,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:    ctx,
-		config: cfg,
-		User:   NewUserClient(cfg),
+		ctx:           ctx,
+		config:        cfg,
+		Guild:         NewGuildClient(cfg),
+		GuildSettings: NewGuildSettingsClient(cfg),
 	}, nil
 }
 
@@ -88,16 +96,17 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:    ctx,
-		config: cfg,
-		User:   NewUserClient(cfg),
+		ctx:           ctx,
+		config:        cfg,
+		Guild:         NewGuildClient(cfg),
+		GuildSettings: NewGuildSettingsClient(cfg),
 	}, nil
 }
 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		User.
+//		Guild.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -119,87 +128,88 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.User.Use(hooks...)
+	c.Guild.Use(hooks...)
+	c.GuildSettings.Use(hooks...)
 }
 
-// UserClient is a client for the User schema.
-type UserClient struct {
+// GuildClient is a client for the Guild schema.
+type GuildClient struct {
 	config
 }
 
-// NewUserClient returns a client for the User from the given config.
-func NewUserClient(c config) *UserClient {
-	return &UserClient{config: c}
+// NewGuildClient returns a client for the Guild from the given config.
+func NewGuildClient(c config) *GuildClient {
+	return &GuildClient{config: c}
 }
 
 // Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `user.Hooks(f(g(h())))`.
-func (c *UserClient) Use(hooks ...Hook) {
-	c.hooks.User = append(c.hooks.User, hooks...)
+// A call to `Use(f, g, h)` equals to `guild.Hooks(f(g(h())))`.
+func (c *GuildClient) Use(hooks ...Hook) {
+	c.hooks.Guild = append(c.hooks.Guild, hooks...)
 }
 
-// Create returns a builder for creating a User entity.
-func (c *UserClient) Create() *UserCreate {
-	mutation := newUserMutation(c.config, OpCreate)
-	return &UserCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Create returns a builder for creating a Guild entity.
+func (c *GuildClient) Create() *GuildCreate {
+	mutation := newGuildMutation(c.config, OpCreate)
+	return &GuildCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// CreateBulk returns a builder for creating a bulk of User entities.
-func (c *UserClient) CreateBulk(builders ...*UserCreate) *UserCreateBulk {
-	return &UserCreateBulk{config: c.config, builders: builders}
+// CreateBulk returns a builder for creating a bulk of Guild entities.
+func (c *GuildClient) CreateBulk(builders ...*GuildCreate) *GuildCreateBulk {
+	return &GuildCreateBulk{config: c.config, builders: builders}
 }
 
-// Update returns an update builder for User.
-func (c *UserClient) Update() *UserUpdate {
-	mutation := newUserMutation(c.config, OpUpdate)
-	return &UserUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Update returns an update builder for Guild.
+func (c *GuildClient) Update() *GuildUpdate {
+	mutation := newGuildMutation(c.config, OpUpdate)
+	return &GuildUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOne returns an update builder for the given entity.
-func (c *UserClient) UpdateOne(u *User) *UserUpdateOne {
-	mutation := newUserMutation(c.config, OpUpdateOne, withUser(u))
-	return &UserUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *GuildClient) UpdateOne(gu *Guild) *GuildUpdateOne {
+	mutation := newGuildMutation(c.config, OpUpdateOne, withGuild(gu))
+	return &GuildUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // UpdateOneID returns an update builder for the given id.
-func (c *UserClient) UpdateOneID(id int) *UserUpdateOne {
-	mutation := newUserMutation(c.config, OpUpdateOne, withUserID(id))
-	return &UserUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+func (c *GuildClient) UpdateOneID(id int) *GuildUpdateOne {
+	mutation := newGuildMutation(c.config, OpUpdateOne, withGuildID(id))
+	return &GuildUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
-// Delete returns a delete builder for User.
-func (c *UserClient) Delete() *UserDelete {
-	mutation := newUserMutation(c.config, OpDelete)
-	return &UserDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+// Delete returns a delete builder for Guild.
+func (c *GuildClient) Delete() *GuildDelete {
+	mutation := newGuildMutation(c.config, OpDelete)
+	return &GuildDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
 }
 
 // DeleteOne returns a builder for deleting the given entity.
-func (c *UserClient) DeleteOne(u *User) *UserDeleteOne {
-	return c.DeleteOneID(u.ID)
+func (c *GuildClient) DeleteOne(gu *Guild) *GuildDeleteOne {
+	return c.DeleteOneID(gu.ID)
 }
 
 // DeleteOne returns a builder for deleting the given entity by its id.
-func (c *UserClient) DeleteOneID(id int) *UserDeleteOne {
-	builder := c.Delete().Where(user.ID(id))
+func (c *GuildClient) DeleteOneID(id int) *GuildDeleteOne {
+	builder := c.Delete().Where(guild.ID(id))
 	builder.mutation.id = &id
 	builder.mutation.op = OpDeleteOne
-	return &UserDeleteOne{builder}
+	return &GuildDeleteOne{builder}
 }
 
-// Query returns a query builder for User.
-func (c *UserClient) Query() *UserQuery {
-	return &UserQuery{
+// Query returns a query builder for Guild.
+func (c *GuildClient) Query() *GuildQuery {
+	return &GuildQuery{
 		config: c.config,
 	}
 }
 
-// Get returns a User entity by its id.
-func (c *UserClient) Get(ctx context.Context, id int) (*User, error) {
-	return c.Query().Where(user.ID(id)).Only(ctx)
+// Get returns a Guild entity by its id.
+func (c *GuildClient) Get(ctx context.Context, id int) (*Guild, error) {
+	return c.Query().Where(guild.ID(id)).Only(ctx)
 }
 
 // GetX is like Get, but panics if an error occurs.
-func (c *UserClient) GetX(ctx context.Context, id int) *User {
+func (c *GuildClient) GetX(ctx context.Context, id int) *Guild {
 	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
@@ -207,7 +217,129 @@ func (c *UserClient) GetX(ctx context.Context, id int) *User {
 	return obj
 }
 
+// QueryGuildSettings queries the guild_settings edge of a Guild.
+func (c *GuildClient) QueryGuildSettings(gu *Guild) *GuildSettingsQuery {
+	query := &GuildSettingsQuery{config: c.config}
+	query.path = func(ctx context.Context) (fromV *sql.Selector, _ error) {
+		id := gu.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(guild.Table, guild.FieldID, id),
+			sqlgraph.To(guildsettings.Table, guildsettings.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, guild.GuildSettingsTable, guild.GuildSettingsColumn),
+		)
+		fromV = sqlgraph.Neighbors(gu.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
-func (c *UserClient) Hooks() []Hook {
-	return c.hooks.User
+func (c *GuildClient) Hooks() []Hook {
+	return c.hooks.Guild
+}
+
+// GuildSettingsClient is a client for the GuildSettings schema.
+type GuildSettingsClient struct {
+	config
+}
+
+// NewGuildSettingsClient returns a client for the GuildSettings from the given config.
+func NewGuildSettingsClient(c config) *GuildSettingsClient {
+	return &GuildSettingsClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `guildsettings.Hooks(f(g(h())))`.
+func (c *GuildSettingsClient) Use(hooks ...Hook) {
+	c.hooks.GuildSettings = append(c.hooks.GuildSettings, hooks...)
+}
+
+// Create returns a builder for creating a GuildSettings entity.
+func (c *GuildSettingsClient) Create() *GuildSettingsCreate {
+	mutation := newGuildSettingsMutation(c.config, OpCreate)
+	return &GuildSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of GuildSettings entities.
+func (c *GuildSettingsClient) CreateBulk(builders ...*GuildSettingsCreate) *GuildSettingsCreateBulk {
+	return &GuildSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for GuildSettings.
+func (c *GuildSettingsClient) Update() *GuildSettingsUpdate {
+	mutation := newGuildSettingsMutation(c.config, OpUpdate)
+	return &GuildSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *GuildSettingsClient) UpdateOne(gs *GuildSettings) *GuildSettingsUpdateOne {
+	mutation := newGuildSettingsMutation(c.config, OpUpdateOne, withGuildSettings(gs))
+	return &GuildSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *GuildSettingsClient) UpdateOneID(id int) *GuildSettingsUpdateOne {
+	mutation := newGuildSettingsMutation(c.config, OpUpdateOne, withGuildSettingsID(id))
+	return &GuildSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for GuildSettings.
+func (c *GuildSettingsClient) Delete() *GuildSettingsDelete {
+	mutation := newGuildSettingsMutation(c.config, OpDelete)
+	return &GuildSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *GuildSettingsClient) DeleteOne(gs *GuildSettings) *GuildSettingsDeleteOne {
+	return c.DeleteOneID(gs.ID)
+}
+
+// DeleteOne returns a builder for deleting the given entity by its id.
+func (c *GuildSettingsClient) DeleteOneID(id int) *GuildSettingsDeleteOne {
+	builder := c.Delete().Where(guildsettings.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &GuildSettingsDeleteOne{builder}
+}
+
+// Query returns a query builder for GuildSettings.
+func (c *GuildSettingsClient) Query() *GuildSettingsQuery {
+	return &GuildSettingsQuery{
+		config: c.config,
+	}
+}
+
+// Get returns a GuildSettings entity by its id.
+func (c *GuildSettingsClient) Get(ctx context.Context, id int) (*GuildSettings, error) {
+	return c.Query().Where(guildsettings.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *GuildSettingsClient) GetX(ctx context.Context, id int) *GuildSettings {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryGuild queries the guild edge of a GuildSettings.
+func (c *GuildSettingsClient) QueryGuild(gs *GuildSettings) *GuildQuery {
+	query := &GuildQuery{config: c.config}
+	query.path = func(ctx context.Context) (fromV *sql.Selector, _ error) {
+		id := gs.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(guildsettings.Table, guildsettings.FieldID, id),
+			sqlgraph.To(guild.Table, guild.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, guildsettings.GuildTable, guildsettings.GuildColumn),
+		)
+		fromV = sqlgraph.Neighbors(gs.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *GuildSettingsClient) Hooks() []Hook {
+	return c.hooks.GuildSettings
 }
