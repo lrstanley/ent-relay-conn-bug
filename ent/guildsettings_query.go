@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 
@@ -346,6 +347,12 @@ func (gsq *GuildSettingsQuery) prepareQuery(ctx context.Context) error {
 			return err
 		}
 		gsq.sql = prev
+	}
+	if guildsettings.Policy == nil {
+		return errors.New("ent: uninitialized guildsettings.Policy (forgotten import ent/runtime?)")
+	}
+	if err := guildsettings.Policy.EvalQuery(ctx, gsq); err != nil {
+		return err
 	}
 	return nil
 }

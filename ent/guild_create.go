@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/lrstanley/ent-relay-conn-bug/ent/guild"
@@ -19,6 +20,7 @@ type GuildCreate struct {
 	config
 	mutation *GuildMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetCreateTime sets the "create_time" field.
@@ -199,7 +201,9 @@ func (gc *GuildCreate) Save(ctx context.Context) (*Guild, error) {
 		err  error
 		node *Guild
 	)
-	gc.defaults()
+	if err := gc.defaults(); err != nil {
+		return nil, err
+	}
 	if len(gc.hooks) == 0 {
 		if err = gc.check(); err != nil {
 			return nil, err
@@ -264,12 +268,18 @@ func (gc *GuildCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gc *GuildCreate) defaults() {
+func (gc *GuildCreate) defaults() error {
 	if _, ok := gc.mutation.CreateTime(); !ok {
+		if guild.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized guild.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := guild.DefaultCreateTime()
 		gc.mutation.SetCreateTime(v)
 	}
 	if _, ok := gc.mutation.UpdateTime(); !ok {
+		if guild.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized guild.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := guild.DefaultUpdateTime()
 		gc.mutation.SetUpdateTime(v)
 	}
@@ -289,6 +299,7 @@ func (gc *GuildCreate) defaults() {
 		v := guild.DefaultPermissions
 		gc.mutation.SetPermissions(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -366,6 +377,7 @@ func (gc *GuildCreate) createSpec() (*Guild, *sqlgraph.CreateSpec) {
 			},
 		}
 	)
+	_spec.OnConflict = gc.conflict
 	if value, ok := gc.mutation.CreateTime(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -500,10 +512,547 @@ func (gc *GuildCreate) createSpec() (*Guild, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Guild.Create().
+//		SetCreateTime(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GuildUpsert) {
+//			SetCreateTime(v+v).
+//		}).
+//		Exec(ctx)
+func (gc *GuildCreate) OnConflict(opts ...sql.ConflictOption) *GuildUpsertOne {
+	gc.conflict = opts
+	return &GuildUpsertOne{
+		create: gc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gc *GuildCreate) OnConflictColumns(columns ...string) *GuildUpsertOne {
+	gc.conflict = append(gc.conflict, sql.ConflictColumns(columns...))
+	return &GuildUpsertOne{
+		create: gc,
+	}
+}
+
+type (
+	// GuildUpsertOne is the builder for "upsert"-ing
+	//  one Guild node.
+	GuildUpsertOne struct {
+		create *GuildCreate
+	}
+
+	// GuildUpsert is the "OnConflict" setter.
+	GuildUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildUpsert) SetUpdateTime(v time.Time) *GuildUpsert {
+	u.Set(guild.FieldUpdateTime, v)
+	return u
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateUpdateTime() *GuildUpsert {
+	u.SetExcluded(guild.FieldUpdateTime)
+	return u
+}
+
+// SetName sets the "name" field.
+func (u *GuildUpsert) SetName(v string) *GuildUpsert {
+	u.Set(guild.FieldName, v)
+	return u
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateName() *GuildUpsert {
+	u.SetExcluded(guild.FieldName)
+	return u
+}
+
+// SetFeatures sets the "features" field.
+func (u *GuildUpsert) SetFeatures(v []string) *GuildUpsert {
+	u.Set(guild.FieldFeatures, v)
+	return u
+}
+
+// UpdateFeatures sets the "features" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateFeatures() *GuildUpsert {
+	u.SetExcluded(guild.FieldFeatures)
+	return u
+}
+
+// ClearFeatures clears the value of the "features" field.
+func (u *GuildUpsert) ClearFeatures() *GuildUpsert {
+	u.SetNull(guild.FieldFeatures)
+	return u
+}
+
+// SetIconHash sets the "icon_hash" field.
+func (u *GuildUpsert) SetIconHash(v string) *GuildUpsert {
+	u.Set(guild.FieldIconHash, v)
+	return u
+}
+
+// UpdateIconHash sets the "icon_hash" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateIconHash() *GuildUpsert {
+	u.SetExcluded(guild.FieldIconHash)
+	return u
+}
+
+// ClearIconHash clears the value of the "icon_hash" field.
+func (u *GuildUpsert) ClearIconHash() *GuildUpsert {
+	u.SetNull(guild.FieldIconHash)
+	return u
+}
+
+// SetIconURL sets the "icon_url" field.
+func (u *GuildUpsert) SetIconURL(v string) *GuildUpsert {
+	u.Set(guild.FieldIconURL, v)
+	return u
+}
+
+// UpdateIconURL sets the "icon_url" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateIconURL() *GuildUpsert {
+	u.SetExcluded(guild.FieldIconURL)
+	return u
+}
+
+// SetLarge sets the "large" field.
+func (u *GuildUpsert) SetLarge(v bool) *GuildUpsert {
+	u.Set(guild.FieldLarge, v)
+	return u
+}
+
+// UpdateLarge sets the "large" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateLarge() *GuildUpsert {
+	u.SetExcluded(guild.FieldLarge)
+	return u
+}
+
+// ClearLarge clears the value of the "large" field.
+func (u *GuildUpsert) ClearLarge() *GuildUpsert {
+	u.SetNull(guild.FieldLarge)
+	return u
+}
+
+// SetMemberCount sets the "member_count" field.
+func (u *GuildUpsert) SetMemberCount(v int) *GuildUpsert {
+	u.Set(guild.FieldMemberCount, v)
+	return u
+}
+
+// UpdateMemberCount sets the "member_count" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateMemberCount() *GuildUpsert {
+	u.SetExcluded(guild.FieldMemberCount)
+	return u
+}
+
+// AddMemberCount adds v to the "member_count" field.
+func (u *GuildUpsert) AddMemberCount(v int) *GuildUpsert {
+	u.Add(guild.FieldMemberCount, v)
+	return u
+}
+
+// ClearMemberCount clears the value of the "member_count" field.
+func (u *GuildUpsert) ClearMemberCount() *GuildUpsert {
+	u.SetNull(guild.FieldMemberCount)
+	return u
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (u *GuildUpsert) SetOwnerID(v string) *GuildUpsert {
+	u.Set(guild.FieldOwnerID, v)
+	return u
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateOwnerID() *GuildUpsert {
+	u.SetExcluded(guild.FieldOwnerID)
+	return u
+}
+
+// SetPermissions sets the "permissions" field.
+func (u *GuildUpsert) SetPermissions(v uint64) *GuildUpsert {
+	u.Set(guild.FieldPermissions, v)
+	return u
+}
+
+// UpdatePermissions sets the "permissions" field to the value that was provided on create.
+func (u *GuildUpsert) UpdatePermissions() *GuildUpsert {
+	u.SetExcluded(guild.FieldPermissions)
+	return u
+}
+
+// AddPermissions adds v to the "permissions" field.
+func (u *GuildUpsert) AddPermissions(v uint64) *GuildUpsert {
+	u.Add(guild.FieldPermissions, v)
+	return u
+}
+
+// ClearPermissions clears the value of the "permissions" field.
+func (u *GuildUpsert) ClearPermissions() *GuildUpsert {
+	u.SetNull(guild.FieldPermissions)
+	return u
+}
+
+// SetRegion sets the "region" field.
+func (u *GuildUpsert) SetRegion(v string) *GuildUpsert {
+	u.Set(guild.FieldRegion, v)
+	return u
+}
+
+// UpdateRegion sets the "region" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateRegion() *GuildUpsert {
+	u.SetExcluded(guild.FieldRegion)
+	return u
+}
+
+// ClearRegion clears the value of the "region" field.
+func (u *GuildUpsert) ClearRegion() *GuildUpsert {
+	u.SetNull(guild.FieldRegion)
+	return u
+}
+
+// SetSystemChannelFlags sets the "system_channel_flags" field.
+func (u *GuildUpsert) SetSystemChannelFlags(v string) *GuildUpsert {
+	u.Set(guild.FieldSystemChannelFlags, v)
+	return u
+}
+
+// UpdateSystemChannelFlags sets the "system_channel_flags" field to the value that was provided on create.
+func (u *GuildUpsert) UpdateSystemChannelFlags() *GuildUpsert {
+	u.SetExcluded(guild.FieldSystemChannelFlags)
+	return u
+}
+
+// ClearSystemChannelFlags clears the value of the "system_channel_flags" field.
+func (u *GuildUpsert) ClearSystemChannelFlags() *GuildUpsert {
+	u.SetNull(guild.FieldSystemChannelFlags)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GuildUpsertOne) UpdateNewValues() *GuildUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreateTime(); exists {
+			s.SetIgnore(guild.FieldCreateTime)
+		}
+		if _, exists := u.create.mutation.GuildID(); exists {
+			s.SetIgnore(guild.FieldGuildID)
+		}
+		if _, exists := u.create.mutation.JoinedAt(); exists {
+			s.SetIgnore(guild.FieldJoinedAt)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *GuildUpsertOne) Ignore() *GuildUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GuildUpsertOne) DoNothing() *GuildUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GuildCreate.OnConflict
+// documentation for more info.
+func (u *GuildUpsertOne) Update(set func(*GuildUpsert)) *GuildUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GuildUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildUpsertOne) SetUpdateTime(v time.Time) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetUpdateTime(v)
+	})
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateUpdateTime() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateUpdateTime()
+	})
+}
+
+// SetName sets the "name" field.
+func (u *GuildUpsertOne) SetName(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateName() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetFeatures sets the "features" field.
+func (u *GuildUpsertOne) SetFeatures(v []string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetFeatures(v)
+	})
+}
+
+// UpdateFeatures sets the "features" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateFeatures() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateFeatures()
+	})
+}
+
+// ClearFeatures clears the value of the "features" field.
+func (u *GuildUpsertOne) ClearFeatures() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearFeatures()
+	})
+}
+
+// SetIconHash sets the "icon_hash" field.
+func (u *GuildUpsertOne) SetIconHash(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetIconHash(v)
+	})
+}
+
+// UpdateIconHash sets the "icon_hash" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateIconHash() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateIconHash()
+	})
+}
+
+// ClearIconHash clears the value of the "icon_hash" field.
+func (u *GuildUpsertOne) ClearIconHash() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearIconHash()
+	})
+}
+
+// SetIconURL sets the "icon_url" field.
+func (u *GuildUpsertOne) SetIconURL(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetIconURL(v)
+	})
+}
+
+// UpdateIconURL sets the "icon_url" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateIconURL() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateIconURL()
+	})
+}
+
+// SetLarge sets the "large" field.
+func (u *GuildUpsertOne) SetLarge(v bool) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetLarge(v)
+	})
+}
+
+// UpdateLarge sets the "large" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateLarge() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateLarge()
+	})
+}
+
+// ClearLarge clears the value of the "large" field.
+func (u *GuildUpsertOne) ClearLarge() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearLarge()
+	})
+}
+
+// SetMemberCount sets the "member_count" field.
+func (u *GuildUpsertOne) SetMemberCount(v int) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetMemberCount(v)
+	})
+}
+
+// AddMemberCount adds v to the "member_count" field.
+func (u *GuildUpsertOne) AddMemberCount(v int) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.AddMemberCount(v)
+	})
+}
+
+// UpdateMemberCount sets the "member_count" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateMemberCount() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateMemberCount()
+	})
+}
+
+// ClearMemberCount clears the value of the "member_count" field.
+func (u *GuildUpsertOne) ClearMemberCount() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearMemberCount()
+	})
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (u *GuildUpsertOne) SetOwnerID(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetOwnerID(v)
+	})
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateOwnerID() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateOwnerID()
+	})
+}
+
+// SetPermissions sets the "permissions" field.
+func (u *GuildUpsertOne) SetPermissions(v uint64) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetPermissions(v)
+	})
+}
+
+// AddPermissions adds v to the "permissions" field.
+func (u *GuildUpsertOne) AddPermissions(v uint64) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.AddPermissions(v)
+	})
+}
+
+// UpdatePermissions sets the "permissions" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdatePermissions() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdatePermissions()
+	})
+}
+
+// ClearPermissions clears the value of the "permissions" field.
+func (u *GuildUpsertOne) ClearPermissions() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearPermissions()
+	})
+}
+
+// SetRegion sets the "region" field.
+func (u *GuildUpsertOne) SetRegion(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetRegion(v)
+	})
+}
+
+// UpdateRegion sets the "region" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateRegion() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateRegion()
+	})
+}
+
+// ClearRegion clears the value of the "region" field.
+func (u *GuildUpsertOne) ClearRegion() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearRegion()
+	})
+}
+
+// SetSystemChannelFlags sets the "system_channel_flags" field.
+func (u *GuildUpsertOne) SetSystemChannelFlags(v string) *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetSystemChannelFlags(v)
+	})
+}
+
+// UpdateSystemChannelFlags sets the "system_channel_flags" field to the value that was provided on create.
+func (u *GuildUpsertOne) UpdateSystemChannelFlags() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateSystemChannelFlags()
+	})
+}
+
+// ClearSystemChannelFlags clears the value of the "system_channel_flags" field.
+func (u *GuildUpsertOne) ClearSystemChannelFlags() *GuildUpsertOne {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearSystemChannelFlags()
+	})
+}
+
+// Exec executes the query.
+func (u *GuildUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GuildCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GuildUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *GuildUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *GuildUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // GuildCreateBulk is the builder for creating many Guild entities in bulk.
 type GuildCreateBulk struct {
 	config
 	builders []*GuildCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the Guild entities in the database.
@@ -530,6 +1079,7 @@ func (gcb *GuildCreateBulk) Save(ctx context.Context) ([]*Guild, error) {
 					_, err = mutators[i+1].Mutate(root, gcb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = gcb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, gcb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -580,6 +1130,337 @@ func (gcb *GuildCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (gcb *GuildCreateBulk) ExecX(ctx context.Context) {
 	if err := gcb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.Guild.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GuildUpsert) {
+//			SetCreateTime(v+v).
+//		}).
+//		Exec(ctx)
+func (gcb *GuildCreateBulk) OnConflict(opts ...sql.ConflictOption) *GuildUpsertBulk {
+	gcb.conflict = opts
+	return &GuildUpsertBulk{
+		create: gcb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gcb *GuildCreateBulk) OnConflictColumns(columns ...string) *GuildUpsertBulk {
+	gcb.conflict = append(gcb.conflict, sql.ConflictColumns(columns...))
+	return &GuildUpsertBulk{
+		create: gcb,
+	}
+}
+
+// GuildUpsertBulk is the builder for "upsert"-ing
+// a bulk of Guild nodes.
+type GuildUpsertBulk struct {
+	create *GuildCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GuildUpsertBulk) UpdateNewValues() *GuildUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreateTime(); exists {
+				s.SetIgnore(guild.FieldCreateTime)
+			}
+			if _, exists := b.mutation.GuildID(); exists {
+				s.SetIgnore(guild.FieldGuildID)
+			}
+			if _, exists := b.mutation.JoinedAt(); exists {
+				s.SetIgnore(guild.FieldJoinedAt)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.Guild.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *GuildUpsertBulk) Ignore() *GuildUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GuildUpsertBulk) DoNothing() *GuildUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GuildCreateBulk.OnConflict
+// documentation for more info.
+func (u *GuildUpsertBulk) Update(set func(*GuildUpsert)) *GuildUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GuildUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildUpsertBulk) SetUpdateTime(v time.Time) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetUpdateTime(v)
+	})
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateUpdateTime() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateUpdateTime()
+	})
+}
+
+// SetName sets the "name" field.
+func (u *GuildUpsertBulk) SetName(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetName(v)
+	})
+}
+
+// UpdateName sets the "name" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateName() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateName()
+	})
+}
+
+// SetFeatures sets the "features" field.
+func (u *GuildUpsertBulk) SetFeatures(v []string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetFeatures(v)
+	})
+}
+
+// UpdateFeatures sets the "features" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateFeatures() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateFeatures()
+	})
+}
+
+// ClearFeatures clears the value of the "features" field.
+func (u *GuildUpsertBulk) ClearFeatures() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearFeatures()
+	})
+}
+
+// SetIconHash sets the "icon_hash" field.
+func (u *GuildUpsertBulk) SetIconHash(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetIconHash(v)
+	})
+}
+
+// UpdateIconHash sets the "icon_hash" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateIconHash() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateIconHash()
+	})
+}
+
+// ClearIconHash clears the value of the "icon_hash" field.
+func (u *GuildUpsertBulk) ClearIconHash() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearIconHash()
+	})
+}
+
+// SetIconURL sets the "icon_url" field.
+func (u *GuildUpsertBulk) SetIconURL(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetIconURL(v)
+	})
+}
+
+// UpdateIconURL sets the "icon_url" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateIconURL() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateIconURL()
+	})
+}
+
+// SetLarge sets the "large" field.
+func (u *GuildUpsertBulk) SetLarge(v bool) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetLarge(v)
+	})
+}
+
+// UpdateLarge sets the "large" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateLarge() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateLarge()
+	})
+}
+
+// ClearLarge clears the value of the "large" field.
+func (u *GuildUpsertBulk) ClearLarge() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearLarge()
+	})
+}
+
+// SetMemberCount sets the "member_count" field.
+func (u *GuildUpsertBulk) SetMemberCount(v int) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetMemberCount(v)
+	})
+}
+
+// AddMemberCount adds v to the "member_count" field.
+func (u *GuildUpsertBulk) AddMemberCount(v int) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.AddMemberCount(v)
+	})
+}
+
+// UpdateMemberCount sets the "member_count" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateMemberCount() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateMemberCount()
+	})
+}
+
+// ClearMemberCount clears the value of the "member_count" field.
+func (u *GuildUpsertBulk) ClearMemberCount() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearMemberCount()
+	})
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (u *GuildUpsertBulk) SetOwnerID(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetOwnerID(v)
+	})
+}
+
+// UpdateOwnerID sets the "owner_id" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateOwnerID() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateOwnerID()
+	})
+}
+
+// SetPermissions sets the "permissions" field.
+func (u *GuildUpsertBulk) SetPermissions(v uint64) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetPermissions(v)
+	})
+}
+
+// AddPermissions adds v to the "permissions" field.
+func (u *GuildUpsertBulk) AddPermissions(v uint64) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.AddPermissions(v)
+	})
+}
+
+// UpdatePermissions sets the "permissions" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdatePermissions() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdatePermissions()
+	})
+}
+
+// ClearPermissions clears the value of the "permissions" field.
+func (u *GuildUpsertBulk) ClearPermissions() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearPermissions()
+	})
+}
+
+// SetRegion sets the "region" field.
+func (u *GuildUpsertBulk) SetRegion(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetRegion(v)
+	})
+}
+
+// UpdateRegion sets the "region" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateRegion() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateRegion()
+	})
+}
+
+// ClearRegion clears the value of the "region" field.
+func (u *GuildUpsertBulk) ClearRegion() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearRegion()
+	})
+}
+
+// SetSystemChannelFlags sets the "system_channel_flags" field.
+func (u *GuildUpsertBulk) SetSystemChannelFlags(v string) *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.SetSystemChannelFlags(v)
+	})
+}
+
+// UpdateSystemChannelFlags sets the "system_channel_flags" field to the value that was provided on create.
+func (u *GuildUpsertBulk) UpdateSystemChannelFlags() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.UpdateSystemChannelFlags()
+	})
+}
+
+// ClearSystemChannelFlags clears the value of the "system_channel_flags" field.
+func (u *GuildUpsertBulk) ClearSystemChannelFlags() *GuildUpsertBulk {
+	return u.Update(func(s *GuildUpsert) {
+		s.ClearSystemChannelFlags()
+	})
+}
+
+// Exec executes the query.
+func (u *GuildUpsertBulk) Exec(ctx context.Context) error {
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the GuildCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GuildCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GuildUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

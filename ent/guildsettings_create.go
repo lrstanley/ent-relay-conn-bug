@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/lrstanley/ent-relay-conn-bug/ent/guild"
@@ -19,6 +20,7 @@ type GuildSettingsCreate struct {
 	config
 	mutation *GuildSettingsMutation
 	hooks    []Hook
+	conflict []sql.ConflictOption
 }
 
 // SetCreateTime sets the "create_time" field.
@@ -119,7 +121,9 @@ func (gsc *GuildSettingsCreate) Save(ctx context.Context) (*GuildSettings, error
 		err  error
 		node *GuildSettings
 	)
-	gsc.defaults()
+	if err := gsc.defaults(); err != nil {
+		return nil, err
+	}
 	if len(gsc.hooks) == 0 {
 		if err = gsc.check(); err != nil {
 			return nil, err
@@ -184,12 +188,18 @@ func (gsc *GuildSettingsCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gsc *GuildSettingsCreate) defaults() {
+func (gsc *GuildSettingsCreate) defaults() error {
 	if _, ok := gsc.mutation.CreateTime(); !ok {
+		if guildsettings.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized guildsettings.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := guildsettings.DefaultCreateTime()
 		gsc.mutation.SetCreateTime(v)
 	}
 	if _, ok := gsc.mutation.UpdateTime(); !ok {
+		if guildsettings.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized guildsettings.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := guildsettings.DefaultUpdateTime()
 		gsc.mutation.SetUpdateTime(v)
 	}
@@ -205,6 +215,7 @@ func (gsc *GuildSettingsCreate) defaults() {
 		v := guildsettings.DefaultContactEmail
 		gsc.mutation.SetContactEmail(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -258,6 +269,7 @@ func (gsc *GuildSettingsCreate) createSpec() (*GuildSettings, *sqlgraph.CreateSp
 			},
 		}
 	)
+	_spec.OnConflict = gsc.conflict
 	if value, ok := gsc.mutation.CreateTime(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
 			Type:   field.TypeTime,
@@ -329,10 +341,320 @@ func (gsc *GuildSettingsCreate) createSpec() (*GuildSettings, *sqlgraph.CreateSp
 	return _node, _spec
 }
 
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.GuildSettings.Create().
+//		SetCreateTime(v).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GuildSettingsUpsert) {
+//			SetCreateTime(v+v).
+//		}).
+//		Exec(ctx)
+func (gsc *GuildSettingsCreate) OnConflict(opts ...sql.ConflictOption) *GuildSettingsUpsertOne {
+	gsc.conflict = opts
+	return &GuildSettingsUpsertOne{
+		create: gsc,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gsc *GuildSettingsCreate) OnConflictColumns(columns ...string) *GuildSettingsUpsertOne {
+	gsc.conflict = append(gsc.conflict, sql.ConflictColumns(columns...))
+	return &GuildSettingsUpsertOne{
+		create: gsc,
+	}
+}
+
+type (
+	// GuildSettingsUpsertOne is the builder for "upsert"-ing
+	//  one GuildSettings node.
+	GuildSettingsUpsertOne struct {
+		create *GuildSettingsCreate
+	}
+
+	// GuildSettingsUpsert is the "OnConflict" setter.
+	GuildSettingsUpsert struct {
+		*sql.UpdateSet
+	}
+)
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildSettingsUpsert) SetUpdateTime(v time.Time) *GuildSettingsUpsert {
+	u.Set(guildsettings.FieldUpdateTime, v)
+	return u
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildSettingsUpsert) UpdateUpdateTime() *GuildSettingsUpsert {
+	u.SetExcluded(guildsettings.FieldUpdateTime)
+	return u
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *GuildSettingsUpsert) SetEnabled(v bool) *GuildSettingsUpsert {
+	u.Set(guildsettings.FieldEnabled, v)
+	return u
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *GuildSettingsUpsert) UpdateEnabled() *GuildSettingsUpsert {
+	u.SetExcluded(guildsettings.FieldEnabled)
+	return u
+}
+
+// SetDefaultMaxClones sets the "default_max_clones" field.
+func (u *GuildSettingsUpsert) SetDefaultMaxClones(v int) *GuildSettingsUpsert {
+	u.Set(guildsettings.FieldDefaultMaxClones, v)
+	return u
+}
+
+// UpdateDefaultMaxClones sets the "default_max_clones" field to the value that was provided on create.
+func (u *GuildSettingsUpsert) UpdateDefaultMaxClones() *GuildSettingsUpsert {
+	u.SetExcluded(guildsettings.FieldDefaultMaxClones)
+	return u
+}
+
+// AddDefaultMaxClones adds v to the "default_max_clones" field.
+func (u *GuildSettingsUpsert) AddDefaultMaxClones(v int) *GuildSettingsUpsert {
+	u.Add(guildsettings.FieldDefaultMaxClones, v)
+	return u
+}
+
+// ClearDefaultMaxClones clears the value of the "default_max_clones" field.
+func (u *GuildSettingsUpsert) ClearDefaultMaxClones() *GuildSettingsUpsert {
+	u.SetNull(guildsettings.FieldDefaultMaxClones)
+	return u
+}
+
+// SetRegexMatch sets the "regex_match" field.
+func (u *GuildSettingsUpsert) SetRegexMatch(v string) *GuildSettingsUpsert {
+	u.Set(guildsettings.FieldRegexMatch, v)
+	return u
+}
+
+// UpdateRegexMatch sets the "regex_match" field to the value that was provided on create.
+func (u *GuildSettingsUpsert) UpdateRegexMatch() *GuildSettingsUpsert {
+	u.SetExcluded(guildsettings.FieldRegexMatch)
+	return u
+}
+
+// ClearRegexMatch clears the value of the "regex_match" field.
+func (u *GuildSettingsUpsert) ClearRegexMatch() *GuildSettingsUpsert {
+	u.SetNull(guildsettings.FieldRegexMatch)
+	return u
+}
+
+// SetContactEmail sets the "contact_email" field.
+func (u *GuildSettingsUpsert) SetContactEmail(v string) *GuildSettingsUpsert {
+	u.Set(guildsettings.FieldContactEmail, v)
+	return u
+}
+
+// UpdateContactEmail sets the "contact_email" field to the value that was provided on create.
+func (u *GuildSettingsUpsert) UpdateContactEmail() *GuildSettingsUpsert {
+	u.SetExcluded(guildsettings.FieldContactEmail)
+	return u
+}
+
+// ClearContactEmail clears the value of the "contact_email" field.
+func (u *GuildSettingsUpsert) ClearContactEmail() *GuildSettingsUpsert {
+	u.SetNull(guildsettings.FieldContactEmail)
+	return u
+}
+
+// UpdateNewValues updates the mutable fields using the new values that were set on create.
+// Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GuildSettingsUpsertOne) UpdateNewValues() *GuildSettingsUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		if _, exists := u.create.mutation.CreateTime(); exists {
+			s.SetIgnore(guildsettings.FieldCreateTime)
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//	    OnConflict(sql.ResolveWithIgnore()).
+//	    Exec(ctx)
+func (u *GuildSettingsUpsertOne) Ignore() *GuildSettingsUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GuildSettingsUpsertOne) DoNothing() *GuildSettingsUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GuildSettingsCreate.OnConflict
+// documentation for more info.
+func (u *GuildSettingsUpsertOne) Update(set func(*GuildSettingsUpsert)) *GuildSettingsUpsertOne {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GuildSettingsUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildSettingsUpsertOne) SetUpdateTime(v time.Time) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetUpdateTime(v)
+	})
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildSettingsUpsertOne) UpdateUpdateTime() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateUpdateTime()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *GuildSettingsUpsertOne) SetEnabled(v bool) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *GuildSettingsUpsertOne) UpdateEnabled() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetDefaultMaxClones sets the "default_max_clones" field.
+func (u *GuildSettingsUpsertOne) SetDefaultMaxClones(v int) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetDefaultMaxClones(v)
+	})
+}
+
+// AddDefaultMaxClones adds v to the "default_max_clones" field.
+func (u *GuildSettingsUpsertOne) AddDefaultMaxClones(v int) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.AddDefaultMaxClones(v)
+	})
+}
+
+// UpdateDefaultMaxClones sets the "default_max_clones" field to the value that was provided on create.
+func (u *GuildSettingsUpsertOne) UpdateDefaultMaxClones() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateDefaultMaxClones()
+	})
+}
+
+// ClearDefaultMaxClones clears the value of the "default_max_clones" field.
+func (u *GuildSettingsUpsertOne) ClearDefaultMaxClones() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearDefaultMaxClones()
+	})
+}
+
+// SetRegexMatch sets the "regex_match" field.
+func (u *GuildSettingsUpsertOne) SetRegexMatch(v string) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetRegexMatch(v)
+	})
+}
+
+// UpdateRegexMatch sets the "regex_match" field to the value that was provided on create.
+func (u *GuildSettingsUpsertOne) UpdateRegexMatch() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateRegexMatch()
+	})
+}
+
+// ClearRegexMatch clears the value of the "regex_match" field.
+func (u *GuildSettingsUpsertOne) ClearRegexMatch() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearRegexMatch()
+	})
+}
+
+// SetContactEmail sets the "contact_email" field.
+func (u *GuildSettingsUpsertOne) SetContactEmail(v string) *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetContactEmail(v)
+	})
+}
+
+// UpdateContactEmail sets the "contact_email" field to the value that was provided on create.
+func (u *GuildSettingsUpsertOne) UpdateContactEmail() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateContactEmail()
+	})
+}
+
+// ClearContactEmail clears the value of the "contact_email" field.
+func (u *GuildSettingsUpsertOne) ClearContactEmail() *GuildSettingsUpsertOne {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearContactEmail()
+	})
+}
+
+// Exec executes the query.
+func (u *GuildSettingsUpsertOne) Exec(ctx context.Context) error {
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GuildSettingsCreate.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GuildSettingsUpsertOne) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// Exec executes the UPSERT query and returns the inserted/updated ID.
+func (u *GuildSettingsUpsertOne) ID(ctx context.Context) (id int, err error) {
+	node, err := u.create.Save(ctx)
+	if err != nil {
+		return id, err
+	}
+	return node.ID, nil
+}
+
+// IDX is like ID, but panics if an error occurs.
+func (u *GuildSettingsUpsertOne) IDX(ctx context.Context) int {
+	id, err := u.ID(ctx)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // GuildSettingsCreateBulk is the builder for creating many GuildSettings entities in bulk.
 type GuildSettingsCreateBulk struct {
 	config
 	builders []*GuildSettingsCreate
+	conflict []sql.ConflictOption
 }
 
 // Save creates the GuildSettings entities in the database.
@@ -359,6 +681,7 @@ func (gscb *GuildSettingsCreateBulk) Save(ctx context.Context) ([]*GuildSettings
 					_, err = mutators[i+1].Mutate(root, gscb.builders[i+1].mutation)
 				} else {
 					spec := &sqlgraph.BatchCreateSpec{Nodes: specs}
+					spec.OnConflict = gscb.conflict
 					// Invoke the actual operation on the latest mutation in the chain.
 					if err = sqlgraph.BatchCreate(ctx, gscb.driver, spec); err != nil {
 						if sqlgraph.IsConstraintError(err) {
@@ -409,6 +732,212 @@ func (gscb *GuildSettingsCreateBulk) Exec(ctx context.Context) error {
 // ExecX is like Exec, but panics if an error occurs.
 func (gscb *GuildSettingsCreateBulk) ExecX(ctx context.Context) {
 	if err := gscb.Exec(ctx); err != nil {
+		panic(err)
+	}
+}
+
+// OnConflict allows configuring the `ON CONFLICT` / `ON DUPLICATE KEY` clause
+// of the `INSERT` statement. For example:
+//
+//	client.GuildSettings.CreateBulk(builders...).
+//		OnConflict(
+//			// Update the row with the new values
+//			// the was proposed for insertion.
+//			sql.ResolveWithNewValues(),
+//		).
+//		// Override some of the fields with custom
+//		// update values.
+//		Update(func(u *ent.GuildSettingsUpsert) {
+//			SetCreateTime(v+v).
+//		}).
+//		Exec(ctx)
+func (gscb *GuildSettingsCreateBulk) OnConflict(opts ...sql.ConflictOption) *GuildSettingsUpsertBulk {
+	gscb.conflict = opts
+	return &GuildSettingsUpsertBulk{
+		create: gscb,
+	}
+}
+
+// OnConflictColumns calls `OnConflict` and configures the columns
+// as conflict target. Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//		OnConflict(sql.ConflictColumns(columns...)).
+//		Exec(ctx)
+func (gscb *GuildSettingsCreateBulk) OnConflictColumns(columns ...string) *GuildSettingsUpsertBulk {
+	gscb.conflict = append(gscb.conflict, sql.ConflictColumns(columns...))
+	return &GuildSettingsUpsertBulk{
+		create: gscb,
+	}
+}
+
+// GuildSettingsUpsertBulk is the builder for "upsert"-ing
+// a bulk of GuildSettings nodes.
+type GuildSettingsUpsertBulk struct {
+	create *GuildSettingsCreateBulk
+}
+
+// UpdateNewValues updates the mutable fields using the new values that
+// were set on create. Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//		OnConflict(
+//			sql.ResolveWithNewValues(),
+//		).
+//		Exec(ctx)
+func (u *GuildSettingsUpsertBulk) UpdateNewValues() *GuildSettingsUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithNewValues())
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(s *sql.UpdateSet) {
+		for _, b := range u.create.builders {
+			if _, exists := b.mutation.CreateTime(); exists {
+				s.SetIgnore(guildsettings.FieldCreateTime)
+			}
+		}
+	}))
+	return u
+}
+
+// Ignore sets each column to itself in case of conflict.
+// Using this option is equivalent to using:
+//
+//	client.GuildSettings.Create().
+//		OnConflict(sql.ResolveWithIgnore()).
+//		Exec(ctx)
+func (u *GuildSettingsUpsertBulk) Ignore() *GuildSettingsUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWithIgnore())
+	return u
+}
+
+// DoNothing configures the conflict_action to `DO NOTHING`.
+// Supported only by SQLite and PostgreSQL.
+func (u *GuildSettingsUpsertBulk) DoNothing() *GuildSettingsUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.DoNothing())
+	return u
+}
+
+// Update allows overriding fields `UPDATE` values. See the GuildSettingsCreateBulk.OnConflict
+// documentation for more info.
+func (u *GuildSettingsUpsertBulk) Update(set func(*GuildSettingsUpsert)) *GuildSettingsUpsertBulk {
+	u.create.conflict = append(u.create.conflict, sql.ResolveWith(func(update *sql.UpdateSet) {
+		set(&GuildSettingsUpsert{UpdateSet: update})
+	}))
+	return u
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (u *GuildSettingsUpsertBulk) SetUpdateTime(v time.Time) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetUpdateTime(v)
+	})
+}
+
+// UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
+func (u *GuildSettingsUpsertBulk) UpdateUpdateTime() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateUpdateTime()
+	})
+}
+
+// SetEnabled sets the "enabled" field.
+func (u *GuildSettingsUpsertBulk) SetEnabled(v bool) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetEnabled(v)
+	})
+}
+
+// UpdateEnabled sets the "enabled" field to the value that was provided on create.
+func (u *GuildSettingsUpsertBulk) UpdateEnabled() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateEnabled()
+	})
+}
+
+// SetDefaultMaxClones sets the "default_max_clones" field.
+func (u *GuildSettingsUpsertBulk) SetDefaultMaxClones(v int) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetDefaultMaxClones(v)
+	})
+}
+
+// AddDefaultMaxClones adds v to the "default_max_clones" field.
+func (u *GuildSettingsUpsertBulk) AddDefaultMaxClones(v int) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.AddDefaultMaxClones(v)
+	})
+}
+
+// UpdateDefaultMaxClones sets the "default_max_clones" field to the value that was provided on create.
+func (u *GuildSettingsUpsertBulk) UpdateDefaultMaxClones() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateDefaultMaxClones()
+	})
+}
+
+// ClearDefaultMaxClones clears the value of the "default_max_clones" field.
+func (u *GuildSettingsUpsertBulk) ClearDefaultMaxClones() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearDefaultMaxClones()
+	})
+}
+
+// SetRegexMatch sets the "regex_match" field.
+func (u *GuildSettingsUpsertBulk) SetRegexMatch(v string) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetRegexMatch(v)
+	})
+}
+
+// UpdateRegexMatch sets the "regex_match" field to the value that was provided on create.
+func (u *GuildSettingsUpsertBulk) UpdateRegexMatch() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateRegexMatch()
+	})
+}
+
+// ClearRegexMatch clears the value of the "regex_match" field.
+func (u *GuildSettingsUpsertBulk) ClearRegexMatch() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearRegexMatch()
+	})
+}
+
+// SetContactEmail sets the "contact_email" field.
+func (u *GuildSettingsUpsertBulk) SetContactEmail(v string) *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.SetContactEmail(v)
+	})
+}
+
+// UpdateContactEmail sets the "contact_email" field to the value that was provided on create.
+func (u *GuildSettingsUpsertBulk) UpdateContactEmail() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.UpdateContactEmail()
+	})
+}
+
+// ClearContactEmail clears the value of the "contact_email" field.
+func (u *GuildSettingsUpsertBulk) ClearContactEmail() *GuildSettingsUpsertBulk {
+	return u.Update(func(s *GuildSettingsUpsert) {
+		s.ClearContactEmail()
+	})
+}
+
+// Exec executes the query.
+func (u *GuildSettingsUpsertBulk) Exec(ctx context.Context) error {
+	for i, b := range u.create.builders {
+		if len(b.conflict) != 0 {
+			return fmt.Errorf("ent: OnConflict was set for builder %d. Set it on the GuildSettingsCreateBulk instead", i)
+		}
+	}
+	if len(u.create.conflict) == 0 {
+		return errors.New("ent: missing options for GuildSettingsCreateBulk.OnConflict")
+	}
+	return u.create.Exec(ctx)
+}
+
+// ExecX is like Exec, but panics if an error occurs.
+func (u *GuildSettingsUpsertBulk) ExecX(ctx context.Context) {
+	if err := u.create.Exec(ctx); err != nil {
 		panic(err)
 	}
 }

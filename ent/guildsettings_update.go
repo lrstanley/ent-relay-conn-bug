@@ -118,7 +118,9 @@ func (gsu *GuildSettingsUpdate) Save(ctx context.Context) (int, error) {
 		err      error
 		affected int
 	)
-	gsu.defaults()
+	if err := gsu.defaults(); err != nil {
+		return 0, err
+	}
 	if len(gsu.hooks) == 0 {
 		if err = gsu.check(); err != nil {
 			return 0, err
@@ -174,11 +176,15 @@ func (gsu *GuildSettingsUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gsu *GuildSettingsUpdate) defaults() {
+func (gsu *GuildSettingsUpdate) defaults() error {
 	if _, ok := gsu.mutation.UpdateTime(); !ok {
+		if guildsettings.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized guildsettings.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := guildsettings.UpdateDefaultUpdateTime()
 		gsu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -393,7 +399,9 @@ func (gsuo *GuildSettingsUpdateOne) Save(ctx context.Context) (*GuildSettings, e
 		err  error
 		node *GuildSettings
 	)
-	gsuo.defaults()
+	if err := gsuo.defaults(); err != nil {
+		return nil, err
+	}
 	if len(gsuo.hooks) == 0 {
 		if err = gsuo.check(); err != nil {
 			return nil, err
@@ -455,11 +463,15 @@ func (gsuo *GuildSettingsUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gsuo *GuildSettingsUpdateOne) defaults() {
+func (gsuo *GuildSettingsUpdateOne) defaults() error {
 	if _, ok := gsuo.mutation.UpdateTime(); !ok {
+		if guildsettings.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized guildsettings.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := guildsettings.UpdateDefaultUpdateTime()
 		gsuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -235,7 +235,8 @@ func (c *GuildClient) QueryGuildSettings(gu *Guild) *GuildSettingsQuery {
 
 // Hooks returns the client hooks.
 func (c *GuildClient) Hooks() []Hook {
-	return c.hooks.Guild
+	hooks := c.hooks.Guild
+	return append(hooks[:len(hooks):len(hooks)], guild.Hooks[:]...)
 }
 
 // GuildSettingsClient is a client for the GuildSettings schema.
@@ -341,5 +342,6 @@ func (c *GuildSettingsClient) QueryGuild(gs *GuildSettings) *GuildQuery {
 
 // Hooks returns the client hooks.
 func (c *GuildSettingsClient) Hooks() []Hook {
-	return c.hooks.GuildSettings
+	hooks := c.hooks.GuildSettings
+	return append(hooks[:len(hooks):len(hooks)], guildsettings.Hooks[:]...)
 }

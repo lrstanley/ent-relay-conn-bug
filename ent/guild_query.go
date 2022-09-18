@@ -5,6 +5,7 @@ package ent
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"math"
 
@@ -346,6 +347,12 @@ func (gq *GuildQuery) prepareQuery(ctx context.Context) error {
 			return err
 		}
 		gq.sql = prev
+	}
+	if guild.Policy == nil {
+		return errors.New("ent: uninitialized guild.Policy (forgotten import ent/runtime?)")
+	}
+	if err := guild.Policy.EvalQuery(ctx, gq); err != nil {
+		return err
 	}
 	return nil
 }

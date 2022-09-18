@@ -14,6 +14,7 @@ import (
 
 	"github.com/lrstanley/ent-relay-conn-bug/ent"
 	"github.com/lrstanley/ent-relay-conn-bug/ent/enttest"
+	_ "github.com/lrstanley/ent-relay-conn-bug/ent/runtime"
 )
 
 func TestBugSQLite(t *testing.T) {

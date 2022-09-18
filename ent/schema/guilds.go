@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/mixin"
+	"github.com/lrstanley/ent-relay-conn-bug/ent/privacy"
 )
 
 type Guild struct {
@@ -43,6 +44,17 @@ func (Guild) Fields() []ent.Field {
 func (Guild) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		mixin.Time{},
+	}
+}
+
+func (Guild) Policy() ent.Policy {
+	return privacy.Policy{
+		Mutation: privacy.MutationPolicy{
+			privacy.AlwaysDenyRule(),
+		},
+		Query: privacy.QueryPolicy{
+			AllowRoles([]string{"admin"}, true),
+		},
 	}
 }
 
